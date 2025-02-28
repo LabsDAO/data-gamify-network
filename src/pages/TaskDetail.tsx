@@ -9,6 +9,8 @@ import { usePrivy } from '@privy-io/react-auth';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 const tasksMockData = {
   'oil-spills': {
@@ -61,6 +63,7 @@ const TaskDetail = () => {
   const [labels, setLabels] = useState<string>('');
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [showAuthReminder, setShowAuthReminder] = useState(false);
+  const [storageOption, setStorageOption] = useState<string>("oort");
   
   const task = id ? tasksMockData[id as keyof typeof tasksMockData] : null;
   
@@ -158,7 +161,7 @@ const TaskDetail = () => {
           
           toast({
             title: "Upload successful!",
-            description: `You've earned ${totalPoints} points for your contribution!`,
+            description: `You've earned ${totalPoints} points for your contribution! Files stored on ${storageOption.toUpperCase()}.`,
             variant: "success"
           });
           
@@ -335,6 +338,29 @@ const TaskDetail = () => {
                 onChange={(e) => setLabels(e.target.value)}
                 disabled={uploading}
               ></textarea>
+            </div>
+            
+            <div className="mb-6">
+              <h3 className="font-semibold mb-3">Storage Options</h3>
+              <RadioGroup 
+                defaultValue="oort" 
+                value={storageOption} 
+                onValueChange={setStorageOption}
+                className="flex flex-col space-y-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="oort" id="oort" />
+                  <Label htmlFor="oort" className="cursor-pointer">OORT Cloud (Default)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="aws" id="aws" />
+                  <Label htmlFor="aws" className="cursor-pointer">AWS S3</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="azure" id="azure" />
+                  <Label htmlFor="azure" className="cursor-pointer">Azure Blob Storage</Label>
+                </div>
+              </RadioGroup>
             </div>
             
             {uploading && (
