@@ -1,14 +1,16 @@
 
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LogIn, Menu, X } from 'lucide-react';
+import { LogIn, LogOut, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { usePrivy } from '@privy-io/react-auth';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const { user, handlePrivyLogin } = useAuth();
+  const { user, logout } = useAuth();
+  const { login: privyLogin, authenticated } = usePrivy();
   const navigate = useNavigate();
 
   const toggleMenu = () => {
@@ -41,6 +43,17 @@ const Header = () => {
     };
   }, [isMenuOpen]);
 
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  const handleAuthAction = async () => {
+    if (authenticated) {
+      await logout();
+      navigate('/');
+    } else {
+      privyLogin();
+    }
+  };
+
   return (
     <header 
       className={cn(
@@ -71,22 +84,37 @@ const Header = () => {
             Leaderboard
           </NavLink>
           
-          {user ? (
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="px-4 py-2 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all"
+          {user && (
+            <NavLink
+              to="/dashboard"
+              className={({ isActive }) => cn(
+                'px-3 py-1.5 rounded-full transition-all duration-300',
+                isActive 
+                  ? 'text-primary font-medium bg-primary/10'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
+              )}
             >
               Dashboard
-            </button>
-          ) : (
-            <button 
-              onClick={() => handlePrivyLogin()}
-              className="px-4 py-2 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all"
-            >
-              <LogIn className="w-4 h-4" />
-              Sign In
-            </button>
+            </NavLink>
           )}
+          
+          <Button 
+            onClick={handleAuthAction}
+            variant="default"
+            className="px-4 py-2 rounded-full font-medium flex items-center justify-center gap-2 transition-all"
+          >
+            {authenticated ? (
+              <>
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </>
+            ) : (
+              <>
+                <LogIn className="w-4 h-4" />
+                Sign In
+              </>
+            )}
+          </Button>
         </nav>
 
         {/* Mobile Menu Button */}
@@ -114,24 +142,39 @@ const Header = () => {
                 Leaderboard
               </NavLink>
               
-              {user ? (
-                <button 
-                  onClick={() => navigate('/dashboard')}
-                  className="w-full px-4 py-3 bg-primary text-white rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-all animate-slide-up"
+              {user && (
+                <NavLink
+                  to="/dashboard"
+                  className={({ isActive }) => cn(
+                    'flex w-full px-4 py-3 rounded-lg transition-all duration-300 animate-slide-up',
+                    isActive
+                      ? 'text-primary font-medium bg-primary/10'
+                      : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
+                  )}
                   style={{ animationDelay: '50ms' }}
                 >
                   Dashboard
-                </button>
-              ) : (
-                <button 
-                  onClick={() => handlePrivyLogin()}
-                  className="w-full px-4 py-3 bg-primary text-white rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-all animate-slide-up"
-                  style={{ animationDelay: '50ms' }}
-                >
-                  <LogIn className="w-5 h-5" />
-                  Sign In
-                </button>
+                </NavLink>
               )}
+              
+              <Button 
+                onClick={handleAuthAction}
+                variant="default"
+                className="w-full px-4 py-3 rounded-lg font-medium flex items-center gap-2 transition-all animate-slide-up"
+                style={{ animationDelay: user ? '100ms' : '50ms' }}
+              >
+                {authenticated ? (
+                  <>
+                    <LogOut className="w-5 h-5" />
+                    Sign Out
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-5 h-5" />
+                    Sign In
+                  </>
+                )}
+              </Button>
             </nav>
           </div>
         )}

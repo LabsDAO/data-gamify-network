@@ -1,3 +1,4 @@
+
 import { useState, useEffect, createContext, useContext } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { usePrivy } from '@privy-io/react-auth';
@@ -65,6 +66,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         setUser(newUser);
         localStorage.setItem('labsmarket_user', JSON.stringify(newUser));
+        toast({
+          title: "Successfully signed in",
+          description: `Welcome, ${newUser.username}!`,
+        });
       } else {
         setUser(JSON.parse(storedUser));
       }
@@ -96,6 +101,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       setUser(foundUser);
       localStorage.setItem('labsmarket_user', JSON.stringify(foundUser));
+      toast({
+        title: "Successfully signed in",
+        description: `Welcome back, ${foundUser.username}!`,
+      });
+    } catch (error) {
+      toast({
+        title: "Login failed",
+        description: "Invalid credentials. Please try again.",
+        variant: "destructive",
+      });
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -117,6 +133,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       setUser(newUser);
       localStorage.setItem('labsmarket_user', JSON.stringify(newUser));
+      toast({
+        title: "Account created",
+        description: `Welcome to LabsMarket, ${username}!`,
+      });
+    } catch (error) {
+      toast({
+        title: "Registration failed",
+        description: "Unable to create account. Please try again.",
+        variant: "destructive",
+      });
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -135,6 +162,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       setUser(null);
       localStorage.removeItem('labsmarket_user');
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out.",
+      });
+    } catch (error) {
+      toast({
+        title: "Logout failed",
+        description: "There was an issue signing out. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -159,6 +196,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       setUser(updatedUser);
       localStorage.setItem('labsmarket_user', JSON.stringify(updatedUser));
+      
+      toast({
+        title: "Points added!",
+        description: `You earned ${points} points!`,
+      });
     }
   };
 
