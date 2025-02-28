@@ -143,11 +143,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   
   const addPoints = (points: number) => {
     if (user) {
-      const updatedUser = { 
+      let newTrustLevel: 'Newcomer' | 'Contributor' | 'Expert' = 'Newcomer';
+      const totalPoints = user.points + points;
+      
+      if (totalPoints > 1000) {
+        newTrustLevel = 'Expert';
+      } else if (totalPoints > 500) {
+        newTrustLevel = 'Contributor';
+      }
+      
+      const updatedUser: User = { 
         ...user, 
-        points: user.points + points,
-        trustLevel: user.points + points > 500 ? 'Contributor' : user.points + points > 1000 ? 'Expert' : 'Newcomer'
+        points: totalPoints,
+        trustLevel: newTrustLevel
       };
+      
       setUser(updatedUser);
       localStorage.setItem('labsmarket_user', JSON.stringify(updatedUser));
     }
