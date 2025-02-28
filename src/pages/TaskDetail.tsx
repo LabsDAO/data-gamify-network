@@ -1,15 +1,15 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Upload, Tag, Clock, Award, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Upload, Tag, Clock, Award, CheckCircle, XCircle, AlertCircle, Camera } from 'lucide-react';
 import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { usePrivy } from '@privy-io/react-auth';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { useMobile } from '@/hooks/use-mobile';
 
-// Mock task data
 const tasksMockData = {
   'oil-spills': {
     id: 'oil-spills',
@@ -52,6 +52,8 @@ const TaskDetail = () => {
   const navigate = useNavigate();
   const { user, addPoints } = useAuth();
   const { authenticated, login } = usePrivy();
+  const isMobile = useMobile();
+  const cameraRef = useRef<HTMLInputElement>(null);
   
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -60,11 +62,9 @@ const TaskDetail = () => {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [showAuthReminder, setShowAuthReminder] = useState(false);
   
-  // Get task data based on ID
   const task = id ? tasksMockData[id as keyof typeof tasksMockData] : null;
   
   useEffect(() => {
-    // Show auth reminder after 2 seconds if not authenticated
     if (!authenticated && !user) {
       const timer = setTimeout(() => {
         setShowAuthReminder(true);
@@ -75,7 +75,6 @@ const TaskDetail = () => {
   }, [authenticated, user]);
   
   useEffect(() => {
-    // Clean up preview URLs when component unmounts
     return () => {
       previewUrls.forEach(url => URL.revokeObjectURL(url));
     };
@@ -100,7 +99,6 @@ const TaskDetail = () => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
       
-      // Create preview URLs for images
       const newPreviewUrls = selectedFiles.map(file => {
         if (file.type.startsWith('image/')) {
           return URL.createObjectURL(file);
@@ -110,6 +108,12 @@ const TaskDetail = () => {
       
       setFiles(prev => [...prev, ...selectedFiles]);
       setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+    }
+  };
+  
+  const handleCameraCapture = () => {
+    if (cameraRef.current) {
+      cameraRef.current.click();
     }
   };
   
@@ -135,7 +139,6 @@ const TaskDetail = () => {
     
     setUploading(true);
     
-    // Simulate upload progress
     let progress = 0;
     const interval = setInterval(() => {
       progress += Math.random() * 10;
@@ -147,12 +150,10 @@ const TaskDetail = () => {
         setTimeout(() => {
           setUploading(false);
           
-          // Calculate points earned
           const pointsEarned = task.pointsPerUpload * files.length;
           const labelPoints = labels.trim() ? task.pointsPerLabel : 0;
           const totalPoints = pointsEarned + labelPoints;
           
-          // Add points to user account
           addPoints(totalPoints);
           
           toast({
@@ -161,19 +162,16 @@ const TaskDetail = () => {
             variant: "success"
           });
           
-          // Clear form
           setFiles([]);
           setLabels('');
           setPreviewUrls([]);
           setUploadProgress(0);
-          
         }, 500);
       }
     }, 300);
   };
   
   const handleRemoveFile = (index: number) => {
-    // Revoke object URL to prevent memory leaks
     if (previewUrls[index]) {
       URL.revokeObjectURL(previewUrls[index]);
     }
@@ -241,28 +239,56 @@ const TaskDetail = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <GlassMorphismCard className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Upload Data</h2>
+            <h2 className="text-xl font-semibold mb-4">Upload Images</h2>
             
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 mb-6 text-center">
               <Upload className="w-10 h-10 mx-auto mb-4 text-muted-foreground" />
-              <p className="mb-4">Drag and drop files here or click to browse</p>
-              <input
-                type="file"
-                id="file-upload"
-                multiple
-                accept="image/*,video/*,audio/*"
-                className="hidden"
-                onChange={handleFileChange}
-                disabled={uploading}
-              />
-              <label 
-                htmlFor="file-upload"
-                className="px-4 py-2 bg-primary text-white rounded-md cursor-pointer disabled:opacity-50"
-              >
-                Select Files
-              </label>
-              <p className="text-sm text-muted-foreground mt-2">
-                Supported formats: JPG, PNG, MP3, MP4, WAV (max 50MB per file)
+              <p className="mb-4">Drag and drop images here or use the options below</p>
+              
+              <div className="flex flex-wrap gap-3 justify-center">
+                <input
+                  type="file"
+                  id="file-upload"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  disabled={uploading}
+                />
+                <input
+                  type="file"
+                  id="camera-capture"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleFileChange}
+                  disabled={uploading}
+                  ref={cameraRef}
+                />
+                
+                <label 
+                  htmlFor="file-upload"
+                  className="px-4 py-2 bg-primary text-white rounded-md cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Upload className="w-4 h-4" />
+                  Browse Files
+                </label>
+                
+                {isMobile && (
+                  <Button 
+                    onClick={handleCameraCapture}
+                    variant="secondary"
+                    className="flex items-center gap-2"
+                    disabled={uploading}
+                  >
+                    <Camera className="w-4 h-4" />
+                    Take Photo
+                  </Button>
+                )}
+              </div>
+              
+              <p className="text-sm text-muted-foreground mt-4">
+                Supported formats: JPG, PNG (max 50MB per file)
               </p>
             </div>
             
