@@ -12,6 +12,7 @@ import TaskDetail from "./pages/TaskDetail";
 import Dashboard from "./pages/Dashboard";
 import { PrivyProvider } from "@privy-io/react-auth";
 import Layout from "./components/layout/Layout";
+// OORT Storage is now available through our utility files
 
 const queryClient = new QueryClient();
 
