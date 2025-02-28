@@ -1,8 +1,8 @@
-
 import { useState, useEffect, createContext, useContext } from 'react';
 import { toast } from '@/components/ui/use-toast';
+import { usePrivy } from '@privy-io/react-auth';
 
-// This is a mock auth service
+// This is a mock auth service with Privy integration
 type User = {
   id: string;
   username: string;
@@ -45,32 +45,42 @@ const mockUsers: User[] = [
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { login: privyLogin, logout: privyLogout, authenticated, user: privyUser } = usePrivy();
 
   useEffect(() => {
-    // Check for stored user on mount
+    // Check for stored user on mount or when Privy auth state changes
     const storedUser = localStorage.getItem('labsmarket_user');
-    if (storedUser) {
+    
+    if (authenticated && privyUser) {
+      // If authenticated with Privy but no local user, create one
+      if (!storedUser) {
+        const newUser: User = {
+          id: privyUser.id || `user_${Date.now()}`,
+          username: privyUser.email?.address || `user_${Date.now().toString().slice(-4)}`,
+          trustLevel: 'Newcomer',
+          points: 0,
+          isOrganization: false,
+          walletAddress: privyUser.wallet?.address,
+        };
+        
+        setUser(newUser);
+        localStorage.setItem('labsmarket_user', JSON.stringify(newUser));
+      } else {
+        setUser(JSON.parse(storedUser));
+      }
+    } else if (!authenticated && storedUser) {
+      // If user is stored but not authenticated with Privy, keep using stored user
       setUser(JSON.parse(storedUser));
+    } else if (!authenticated && !storedUser) {
+      // Not authenticated and no stored user
+      setUser(null);
     }
+    
     setIsLoading(false);
-  }, []);
+  }, [authenticated, privyUser]);
 
   const handlePrivyLogin = () => {
-    // Create a mock user for demo purposes
-    const mockUser: User = {
-      id: `user_${Date.now()}`,
-      username: `user_${Date.now().toString().slice(-4)}`,
-      trustLevel: 'Newcomer',
-      points: 0,
-      isOrganization: false,
-    };
-    
-    setUser(mockUser);
-    localStorage.setItem('labsmarket_user', JSON.stringify(mockUser));
-    toast({
-      title: "Authentication successful",
-      description: "Welcome to LabsMarket.ai!",
-    });
+    privyLogin();
   };
 
   const login = async (username: string, password: string) => {
@@ -115,6 +125,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     setIsLoading(true);
     try {
+      // Logout from Privy if authenticated
+      if (authenticated) {
+        await privyLogout();
+      }
+      
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 300));
       
