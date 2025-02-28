@@ -4,13 +4,11 @@ import { LogIn, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { usePrivy } from '@privy-io/react-auth';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const { user } = useAuth();
-  const { authenticated, login } = usePrivy();
+  const { user, handlePrivyLogin } = useAuth();
   const navigate = useNavigate();
 
   const toggleMenu = () => {
@@ -73,7 +71,7 @@ const Header = () => {
             Leaderboard
           </NavLink>
           
-          {authenticated ? (
+          {user ? (
             <button 
               onClick={() => navigate('/dashboard')}
               className="px-4 py-2 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all"
@@ -82,7 +80,7 @@ const Header = () => {
             </button>
           ) : (
             <button 
-              onClick={() => login()}
+              onClick={() => handlePrivyLogin()}
               className="px-4 py-2 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all"
             >
               <LogIn className="w-4 h-4" />
@@ -116,7 +114,7 @@ const Header = () => {
                 Leaderboard
               </NavLink>
               
-              {authenticated ? (
+              {user ? (
                 <button 
                   onClick={() => navigate('/dashboard')}
                   className="w-full px-4 py-3 bg-primary text-white rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-all animate-slide-up"
@@ -126,7 +124,7 @@ const Header = () => {
                 </button>
               ) : (
                 <button 
-                  onClick={() => login()}
+                  onClick={() => handlePrivyLogin()}
                   className="w-full px-4 py-3 bg-primary text-white rounded-lg font-medium flex items-center gap-2 hover:bg-primary/90 transition-all animate-slide-up"
                   style={{ animationDelay: '50ms' }}
                 >

@@ -1,9 +1,8 @@
 
 import { useState, useEffect, createContext, useContext } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
 import { toast } from '@/components/ui/use-toast';
 
-// This is a mock auth service with Privy integration
+// This is a mock auth service
 type User = {
   id: string;
   username: string;
@@ -46,7 +45,6 @@ const mockUsers: User[] = [
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { login: privyLogin, authenticated, ready, user: privyUser, logout: privyLogout } = usePrivy();
 
   useEffect(() => {
     // Check for stored user on mount
@@ -57,31 +55,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoading(false);
   }, []);
 
-  useEffect(() => {
-    // When Privy authenticates the user, update our local state
-    if (ready && authenticated && privyUser) {
-      // In a real implementation, you'd fetch user data from your backend
-      // For now, create a basic user profile
-      const newUser: User = {
-        id: privyUser.id || `privy_${Date.now()}`,
-        username: privyUser.email?.address || `user_${Date.now().toString().slice(-4)}`,
-        trustLevel: 'Newcomer',
-        points: 0,
-        isOrganization: false,
-        walletAddress: privyUser.wallet?.address,
-      };
-      
-      setUser(newUser);
-      localStorage.setItem('labsmarket_user', JSON.stringify(newUser));
-      toast({
-        title: "Authentication successful",
-        description: "Welcome to LabsMarket.ai!",
-      });
-    }
-  }, [ready, authenticated, privyUser]);
-
   const handlePrivyLogin = () => {
-    privyLogin();
+    // Create a mock user for demo purposes
+    const mockUser: User = {
+      id: `user_${Date.now()}`,
+      username: `user_${Date.now().toString().slice(-4)}`,
+      trustLevel: 'Newcomer',
+      points: 0,
+      isOrganization: false,
+    };
+    
+    setUser(mockUser);
+    localStorage.setItem('labsmarket_user', JSON.stringify(mockUser));
+    toast({
+      title: "Authentication successful",
+      description: "Welcome to LabsMarket.ai!",
+    });
   };
 
   const login = async (username: string, password: string) => {
@@ -128,11 +117,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Also logout from Privy
-      if (authenticated) {
-        await privyLogout();
-      }
       
       setUser(null);
       localStorage.removeItem('labsmarket_user');
