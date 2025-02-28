@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Upload, Tag, Clock, Award, CheckCircle, XCircle, AlertCircle, Camera } from 'lucide-react';
@@ -260,7 +259,7 @@ const TaskDetail = () => {
                   type="file"
                   id="camera-capture"
                   accept="image/*"
-                  capture="environment"
+                  capture={isMobile ? "environment" : undefined}
                   className="hidden"
                   onChange={handleFileChange}
                   disabled={uploading}
@@ -275,7 +274,6 @@ const TaskDetail = () => {
                   Browse Files
                 </label>
                 
-                {/* Direct camera button - always visible regardless of device */}
                 <Button 
                   onClick={handleCameraCapture}
                   variant="camera"
