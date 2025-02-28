@@ -40,7 +40,7 @@ const Index = () => {
       color: 'from-blue-500 to-cyan-500'
     },
     {
-      title: 'Preprocess Data',
+      title: 'Label Data',
       description: 'Add valuable metadata and annotations to improve data quality.',
       icon: Database,
       color: 'from-violet-500 to-purple-500'
