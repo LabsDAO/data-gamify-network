@@ -1,5 +1,6 @@
 
-import { Toast, toast } from "@/components/ui/toast";
+import * as React from "react";
+import { Toast } from "@/components/ui/toast";
 
 export interface ToastActionElement {
   altText: string;
@@ -141,9 +142,9 @@ function dispatch(action: Action) {
   });
 }
 
-type Toast = Omit<ToasterToast, "id">;
+type ToastOptions = Omit<ToasterToast, "id">;
 
-function toast({ ...props }: Toast) {
+function toast(props: ToastOptions) {
   const id = genId();
 
   const update = (props: ToasterToast) =>
@@ -166,7 +167,7 @@ function toast({ ...props }: Toast) {
   });
 
   return {
-    id: id,
+    id,
     dismiss,
     update,
   };
