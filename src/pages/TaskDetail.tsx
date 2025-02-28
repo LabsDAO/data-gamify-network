@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { usePrivy } from '@privy-io/react-auth';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const tasksMockData = {
   'oil-spills': {
@@ -52,7 +52,7 @@ const TaskDetail = () => {
   const navigate = useNavigate();
   const { user, addPoints } = useAuth();
   const { authenticated, login } = usePrivy();
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   const cameraRef = useRef<HTMLInputElement>(null);
   
   const [files, setFiles] = useState<File[]>([]);
