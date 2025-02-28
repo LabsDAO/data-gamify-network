@@ -23,7 +23,7 @@ const App = () => (
       appearance: {
         theme: "light",
         accentColor: "#6366F1",
-        logo: "https://your-logo-url.com/logo.png",
+        logo: "/lovable-uploads/3c0d4a69-03a7-4f9f-b704-73bcc535ddef.png",
       },
     }}
   >

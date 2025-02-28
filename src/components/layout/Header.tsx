@@ -67,6 +67,11 @@ const Header = () => {
           to="/" 
           className="flex items-center gap-2 font-bold text-xl md:text-2xl"
         >
+          <img 
+            src="/lovable-uploads/3c0d4a69-03a7-4f9f-b704-73bcc535ddef.png" 
+            alt="LabsMarket.ai Logo" 
+            className="h-8 md:h-10"
+          />
           <span className="text-gradient">LabsMarket.ai</span>
         </NavLink>
 
