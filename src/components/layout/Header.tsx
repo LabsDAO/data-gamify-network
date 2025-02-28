@@ -1,11 +1,13 @@
 
-import { NavLink, useNavigate } from 'react-router-dom';
-import { LogIn, LogOut, Menu, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
 import { usePrivy } from '@privy-io/react-auth';
+import DesktopNavigation from './navigation/DesktopNavigation';
+import MobileNavigation from './navigation/MobileNavigation';
+import MobileMenuButton from './navigation/MobileMenuButton';
+import { NavLink } from 'react-router-dom';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -82,170 +84,24 @@ const Header = () => {
         </NavLink>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-6">
-          <NavLink
-            to="/leaderboard"
-            className={({ isActive }) => cn(
-              'px-3 py-1.5 rounded-full transition-all duration-300',
-              isActive 
-                ? 'text-primary font-medium bg-primary/10'
-                : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
-            )}
-          >
-            Leaderboard
-          </NavLink>
-          
-          <NavLink
-            to="/contribute"
-            className={({ isActive }) => cn(
-              'px-3 py-1.5 rounded-full transition-all duration-300',
-              isActive 
-                ? 'text-primary font-medium bg-primary/10'
-                : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
-            )}
-          >
-            Contribute
-          </NavLink>
-          
-          <NavLink
-            to="/request"
-            className={({ isActive }) => cn(
-              'px-3 py-1.5 rounded-full transition-all duration-300',
-              isActive 
-                ? 'text-primary font-medium bg-primary/10'
-                : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
-            )}
-          >
-            Request Data
-          </NavLink>
-          
-          {user && (
-            <NavLink
-              to="/dashboard"
-              className={({ isActive }) => cn(
-                'px-3 py-1.5 rounded-full transition-all duration-300',
-                isActive 
-                  ? 'text-primary font-medium bg-primary/10'
-                  : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
-              )}
-            >
-              Dashboard
-            </NavLink>
-          )}
-          
-          <Button 
-            onClick={handleAuthAction}
-            variant="default"
-            className="px-4 py-2 rounded-full font-medium flex items-center justify-center gap-2 transition-all"
-          >
-            {authenticated ? (
-              <>
-                <LogOut className="w-4 h-4" />
-                Sign Out
-              </>
-            ) : (
-              <>
-                <LogIn className="w-4 h-4" />
-                Sign In
-              </>
-            )}
-          </Button>
-        </nav>
+        <DesktopNavigation 
+          handleAuthAction={handleAuthAction}
+          authenticated={authenticated}
+        />
 
         {/* Mobile Menu Button */}
-        <button
-          className="block md:hidden text-foreground p-2 menu-button rounded-full"
-          onClick={toggleMenu}
-          aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-        >
-          {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        <MobileMenuButton 
+          isOpen={isMenuOpen} 
+          toggleMenu={toggleMenu} 
+        />
 
         {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="fixed inset-0 top-[56px] md:top-[72px] bg-background/95 backdrop-blur-sm z-40 animate-fade-in md:hidden mobile-menu">
-            <nav className="flex flex-col items-start gap-3 p-4">
-              <NavLink
-                to="/leaderboard"
-                onClick={() => setIsMenuOpen(false)}
-                className={({ isActive }) => cn(
-                  'flex w-full px-4 py-3 rounded-lg transition-all duration-300 animate-slide-up',
-                  isActive
-                    ? 'text-primary font-medium bg-primary/10'
-                    : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
-                )}
-              >
-                Leaderboard
-              </NavLink>
-              
-              <NavLink
-                to="/contribute"
-                onClick={() => setIsMenuOpen(false)}
-                className={({ isActive }) => cn(
-                  'flex w-full px-4 py-3 rounded-lg transition-all duration-300 animate-slide-up',
-                  isActive
-                    ? 'text-primary font-medium bg-primary/10'
-                    : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
-                )}
-                style={{ animationDelay: '50ms' }}
-              >
-                Contribute
-              </NavLink>
-              
-              <NavLink
-                to="/request"
-                onClick={() => setIsMenuOpen(false)}
-                className={({ isActive }) => cn(
-                  'flex w-full px-4 py-3 rounded-lg transition-all duration-300 animate-slide-up',
-                  isActive
-                    ? 'text-primary font-medium bg-primary/10'
-                    : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
-                )}
-                style={{ animationDelay: '100ms' }}
-              >
-                Request Data
-              </NavLink>
-              
-              {user && (
-                <NavLink
-                  to="/dashboard"
-                  onClick={() => setIsMenuOpen(false)}
-                  className={({ isActive }) => cn(
-                    'flex w-full px-4 py-3 rounded-lg transition-all duration-300 animate-slide-up',
-                    isActive
-                      ? 'text-primary font-medium bg-primary/10'
-                      : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
-                  )}
-                  style={{ animationDelay: '150ms' }}
-                >
-                  Dashboard
-                </NavLink>
-              )}
-              
-              <Button 
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  handleAuthAction();
-                }}
-                variant="default"
-                className="w-full px-4 py-3 rounded-lg font-medium flex items-center gap-2 transition-all animate-slide-up mt-2"
-                style={{ animationDelay: user ? '200ms' : '150ms' }}
-              >
-                {authenticated ? (
-                  <>
-                    <LogOut className="w-5 h-5" />
-                    Sign Out
-                  </>
-                ) : (
-                  <>
-                    <LogIn className="w-5 h-5" />
-                    Sign In
-                  </>
-                )}
-              </Button>
-            </nav>
-          </div>
-        )}
+        <MobileNavigation 
+          isMenuOpen={isMenuOpen}
+          setIsMenuOpen={setIsMenuOpen}
+          handleAuthAction={handleAuthAction}
+          authenticated={authenticated}
+        />
       </div>
     </header>
   );
