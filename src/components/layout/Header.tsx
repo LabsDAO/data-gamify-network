@@ -69,10 +69,10 @@ const Header = () => {
         >
           <img 
             src="/lovable-uploads/3c0d4a69-03a7-4f9f-b704-73bcc535ddef.png" 
-            alt="Marketplace Logo" 
+            alt="AI Marketplace Logo" 
             className="h-8 md:h-10"
           />
-          <span className="text-gradient">Marketplace</span>
+          <span className="text-gradient">AI Marketplace</span>
         </NavLink>
 
         {/* Desktop Navigation */}

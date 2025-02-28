@@ -76,7 +76,7 @@ const Index = () => {
           )}
         >
           <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 max-w-4xl leading-tight md:leading-tight lg:leading-tight">
-            <span className="text-gradient">Marketplace</span> <br />
+            <span className="text-gradient">AI Marketplace</span> <br />
             Where Real Effort Meets Reward
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mb-8">
