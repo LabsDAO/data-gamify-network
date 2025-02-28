@@ -95,6 +95,30 @@ const Header = () => {
             Leaderboard
           </NavLink>
           
+          <NavLink
+            to="/contribute"
+            className={({ isActive }) => cn(
+              'px-3 py-1.5 rounded-full transition-all duration-300',
+              isActive 
+                ? 'text-primary font-medium bg-primary/10'
+                : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
+            )}
+          >
+            Contribute
+          </NavLink>
+          
+          <NavLink
+            to="/request"
+            className={({ isActive }) => cn(
+              'px-3 py-1.5 rounded-full transition-all duration-300',
+              isActive 
+                ? 'text-primary font-medium bg-primary/10'
+                : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
+            )}
+          >
+            Request Data
+          </NavLink>
+          
           {user && (
             <NavLink
               to="/dashboard"
@@ -154,6 +178,34 @@ const Header = () => {
                 Leaderboard
               </NavLink>
               
+              <NavLink
+                to="/contribute"
+                onClick={() => setIsMenuOpen(false)}
+                className={({ isActive }) => cn(
+                  'flex w-full px-4 py-3 rounded-lg transition-all duration-300 animate-slide-up',
+                  isActive
+                    ? 'text-primary font-medium bg-primary/10'
+                    : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
+                )}
+                style={{ animationDelay: '50ms' }}
+              >
+                Contribute
+              </NavLink>
+              
+              <NavLink
+                to="/request"
+                onClick={() => setIsMenuOpen(false)}
+                className={({ isActive }) => cn(
+                  'flex w-full px-4 py-3 rounded-lg transition-all duration-300 animate-slide-up',
+                  isActive
+                    ? 'text-primary font-medium bg-primary/10'
+                    : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
+                )}
+                style={{ animationDelay: '100ms' }}
+              >
+                Request Data
+              </NavLink>
+              
               {user && (
                 <NavLink
                   to="/dashboard"
@@ -164,7 +216,7 @@ const Header = () => {
                       ? 'text-primary font-medium bg-primary/10'
                       : 'text-foreground/80 hover:text-foreground hover:bg-foreground/5'
                   )}
-                  style={{ animationDelay: '50ms' }}
+                  style={{ animationDelay: '150ms' }}
                 >
                   Dashboard
                 </NavLink>
@@ -177,7 +229,7 @@ const Header = () => {
                 }}
                 variant="default"
                 className="w-full px-4 py-3 rounded-lg font-medium flex items-center gap-2 transition-all animate-slide-up mt-2"
-                style={{ animationDelay: user ? '100ms' : '50ms' }}
+                style={{ animationDelay: user ? '200ms' : '150ms' }}
               >
                 {authenticated ? (
                   <>
