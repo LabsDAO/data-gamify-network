@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Upload, Tag, Clock, Award, CheckCircle, XCircle, AlertCircle, Camera } from 'lucide-react';
@@ -274,17 +275,16 @@ const TaskDetail = () => {
                   Browse Files
                 </label>
                 
-                {isMobile && (
-                  <Button 
-                    onClick={handleCameraCapture}
-                    variant="secondary"
-                    className="flex items-center gap-2"
-                    disabled={uploading}
-                  >
-                    <Camera className="w-4 h-4" />
-                    Take Photo
-                  </Button>
-                )}
+                {/* Direct camera button - always visible regardless of device */}
+                <Button 
+                  onClick={handleCameraCapture}
+                  variant="camera"
+                  className="flex items-center gap-2"
+                  disabled={uploading}
+                >
+                  <Camera className="w-4 h-4" />
+                  Take Picture
+                </Button>
               </div>
               
               <p className="text-sm text-muted-foreground mt-4">
