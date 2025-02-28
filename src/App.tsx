@@ -44,7 +44,6 @@ const App = () => (
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/task/:id" element={<TaskDetail />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
