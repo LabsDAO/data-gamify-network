@@ -12,6 +12,7 @@ const Header = () => {
   const { user, logout } = useAuth();
   const { login: privyLogin, authenticated } = usePrivy();
   const navigate = useNavigate();
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -43,7 +44,12 @@ const Header = () => {
     };
   }, [isMenuOpen]);
 
-  const [isScrolled, setIsScrolled] = useState(false);
+  // Close menu when navigating
+  useEffect(() => {
+    return () => {
+      setIsMenuOpen(false);
+    };
+  }, [navigate]);
 
   const handleAuthAction = async () => {
     if (authenticated) {
@@ -57,7 +63,7 @@ const Header = () => {
   return (
     <header 
       className={cn(
-        'fixed top-0 left-0 right-0 z-50 transition-all duration-300 py-4 px-6 md:px-10',
+        'fixed top-0 left-0 right-0 z-50 transition-all duration-300 py-3 md:py-4 px-4 md:px-6 lg:px-10',
         isScrolled ? 'glass-morphism shadow-md' : 'bg-transparent'
       )}
     >
@@ -65,12 +71,12 @@ const Header = () => {
         {/* Logo */}
         <NavLink 
           to="/" 
-          className="flex items-center gap-2 font-bold text-xl md:text-2xl"
+          className="flex items-center gap-1 md:gap-2 font-bold text-lg md:text-xl lg:text-2xl"
         >
           <img 
             src="/lovable-uploads/3c0d4a69-03a7-4f9f-b704-73bcc535ddef.png" 
             alt="AI Marketplace Logo" 
-            className="h-8 md:h-10"
+            className="h-7 md:h-8 lg:h-10"
           />
           <span className="text-gradient">AI Marketplace</span>
         </NavLink>
@@ -124,7 +130,7 @@ const Header = () => {
 
         {/* Mobile Menu Button */}
         <button
-          className="block md:hidden text-foreground p-2 menu-button"
+          className="block md:hidden text-foreground p-2 menu-button rounded-full"
           onClick={toggleMenu}
           aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
         >
@@ -133,10 +139,11 @@ const Header = () => {
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="fixed inset-0 top-[72px] bg-background/95 backdrop-blur-sm z-40 animate-fade-in md:hidden mobile-menu">
-            <nav className="flex flex-col items-start gap-4 p-6">
+          <div className="fixed inset-0 top-[56px] md:top-[72px] bg-background/95 backdrop-blur-sm z-40 animate-fade-in md:hidden mobile-menu">
+            <nav className="flex flex-col items-start gap-3 p-4">
               <NavLink
                 to="/leaderboard"
+                onClick={() => setIsMenuOpen(false)}
                 className={({ isActive }) => cn(
                   'flex w-full px-4 py-3 rounded-lg transition-all duration-300 animate-slide-up',
                   isActive
@@ -150,6 +157,7 @@ const Header = () => {
               {user && (
                 <NavLink
                   to="/dashboard"
+                  onClick={() => setIsMenuOpen(false)}
                   className={({ isActive }) => cn(
                     'flex w-full px-4 py-3 rounded-lg transition-all duration-300 animate-slide-up',
                     isActive
@@ -163,9 +171,12 @@ const Header = () => {
               )}
               
               <Button 
-                onClick={handleAuthAction}
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  handleAuthAction();
+                }}
                 variant="default"
-                className="w-full px-4 py-3 rounded-lg font-medium flex items-center gap-2 transition-all animate-slide-up"
+                className="w-full px-4 py-3 rounded-lg font-medium flex items-center gap-2 transition-all animate-slide-up mt-2"
                 style={{ animationDelay: user ? '100ms' : '50ms' }}
               >
                 {authenticated ? (

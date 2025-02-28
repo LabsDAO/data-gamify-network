@@ -66,34 +66,34 @@ const Index = () => {
   ];
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-6">
+    <div className="min-h-screen pt-16 md:pt-24 pb-12 md:pb-16 px-4 md:px-6">
       <div className="container mx-auto">
         {/* Hero Section */}
         <section 
           className={cn(
-            "flex flex-col items-center text-center mb-20 transition-all duration-1000 transform",
+            "flex flex-col items-center text-center mb-12 md:mb-20 transition-all duration-1000 transform",
             isVisible ? "opacity-100" : "opacity-0 translate-y-10"
           )}
         >
-          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 max-w-4xl leading-tight md:leading-tight lg:leading-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 max-w-4xl leading-tight">
             <span className="text-gradient">AI Marketplace</span> <br />
             Where Real Effort Meets Reward
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mb-8">
+          <p className="text-base md:text-lg lg:text-xl text-muted-foreground max-w-3xl mb-6 md:mb-8">
             A decentralized platform connecting trusted individuals worldwide to collect and preprocess data for AI improvement, 
             with transparent incentives and IP monetization.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full justify-center">
             <button 
               onClick={handleGetStarted} 
-              className="px-8 py-3 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-lg hover:shadow-xl hover:translate-y-[-2px]"
+              className="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-lg hover:shadow-xl hover:translate-y-[-2px]"
             >
               {user ? 'Go to Dashboard' : 'Get Started'} 
               <ArrowRight className="w-5 h-5" />
             </button>
             <button 
               onClick={() => navigate('/leaderboard')}
-              className="px-8 py-3 bg-secondary text-foreground rounded-full font-medium flex items-center justify-center gap-2 hover:bg-secondary/80 transition-all"
+              className="w-full sm:w-auto px-6 py-3 bg-secondary text-foreground rounded-full font-medium flex items-center justify-center gap-2 hover:bg-secondary/80 transition-all mt-2 sm:mt-0"
             >
               View Leaderboard
             </button>
@@ -101,15 +101,15 @@ const Index = () => {
         </section>
 
         {/* Features Section */}
-        <section className="mb-24">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Key Features</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
+        <section className="mb-12 md:mb-24">
+          <div className="text-center mb-8 md:mb-12">
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-3 md:mb-4">Key Features</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto px-2">
               Our platform empowers contributors and organizations with powerful tools and features.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {features.map((feature, index) => (
               <GlassMorphismCard 
                 key={index} 
@@ -131,20 +131,20 @@ const Index = () => {
         </section>
 
         {/* CTA Section */}
-        <section className="text-center">
+        <section className="text-center px-2">
           <GlassMorphismCard 
             className="max-w-4xl mx-auto"
             gradient={true}
           >
-            <h2 className="text-2xl md:text-3xl font-bold mb-4">
+            <h2 className="text-xl md:text-2xl lg:text-3xl font-bold mb-3 md:mb-4">
               Ready to contribute and earn rewards?
             </h2>
-            <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
+            <p className="text-muted-foreground mb-6 md:mb-8 max-w-2xl mx-auto">
               Join our community of trusted contributors and start monetizing your data while advancing AI technology.
             </p>
             <button 
               onClick={handleGetStarted}
-              className="px-8 py-3 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all mx-auto shadow-lg hover:shadow-xl hover:translate-y-[-2px]"
+              className="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all mx-auto shadow-lg hover:shadow-xl hover:translate-y-[-2px]"
             >
               {user ? 'Go to Dashboard' : 'Join Now'}
               <ArrowRight className="w-5 h-5" />
