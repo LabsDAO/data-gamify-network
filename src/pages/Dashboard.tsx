@@ -1,216 +1,281 @@
 
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, FileText, Award, Database, Plus, User, BarChart3, Clock } from 'lucide-react';
-import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
-import AnimatedNumber from '@/components/ui/AnimatedNumber';
 import { useAuth } from '@/hooks/useAuth';
-import { cn } from '@/lib/utils';
+import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
+import { Award, Upload, Database, Shield, Clock, Calendar, CheckCircle, Filter } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { usePrivy } from '@privy-io/react-auth';
+
+// Task mock data
+const availableTasks = [
+  {
+    id: 'oil-spills',
+    title: 'Oil Spill Detection Dataset',
+    description: 'Collect images of oil spills in various environments to help train AI models for early detection.',
+    category: 'Environmental',
+    deadline: '2024-05-15',
+    pointsPerUpload: 25,
+    pointsPerLabel: 10,
+    difficulty: 'Medium',
+    progress: 35,
+    image: 'https://images.unsplash.com/photo-1433086966358-54859d0ed716?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8b2NlYW58ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=800&q=60'
+  },
+  {
+    id: 'flat-tires',
+    title: 'Flat Tire Recognition Dataset',
+    description: 'Help build a dataset of flat tires in various conditions for roadside assistance AI.',
+    category: 'Automotive',
+    deadline: '2024-04-30',
+    pointsPerUpload: 20,
+    pointsPerLabel: 8,
+    difficulty: 'Easy',
+    progress: 60,
+    image: 'https://images.unsplash.com/photo-1485833077593-4278bba3f11f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OXx8cm9hZHxlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&w=800&q=60'
+  },
+  {
+    id: 'wildlife-counting',
+    title: 'Wildlife Counting Dataset',
+    description: 'Gather images of wildlife in natural habitats to train AI for population monitoring.',
+    category: 'Wildlife',
+    deadline: '2024-06-20',
+    pointsPerUpload: 30,
+    pointsPerLabel: 15,
+    difficulty: 'Hard',
+    progress: 15,
+    image: 'https://images.unsplash.com/photo-1487252665478-49b61b47f302?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTB8fHdpbGRsaWZlfGVufDB8fDB8fHww&auto=format&fit=crop&w=800&q=60'
+  }
+];
+
+// Contribution stats mock data
+const contributionStats = {
+  totalPoints: 475,
+  uploads: 18,
+  preprocessing: 12,
+  verified: 15,
+  trustLevel: 'Contributor',
+  nextLevel: {
+    name: 'Expert',
+    pointsRequired: 750,
+    pointsRemaining: 275
+  }
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const { authenticated, login } = usePrivy();
+  const [filter, setFilter] = useState('all');
 
-  // Mock activity data
-  const mockActivity = [
-    { id: 1, type: 'upload', description: 'Uploaded 5 images', timestamp: new Date(Date.now() - 3600000).toISOString(), points: 50 },
-    { id: 2, type: 'preprocess', description: 'Added metadata to 10 files', timestamp: new Date(Date.now() - 86400000).toISOString(), points: 25 },
-    { id: 3, type: 'register', description: 'Registered IP for 2 datasets', timestamp: new Date(Date.now() - 172800000).toISOString(), points: 20 },
-  ];
-
-  useEffect(() => {
-    // Simulate loading data
-    const timer = setTimeout(() => {
-      setRecentActivity(mockActivity);
-      setIsLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'upload':
-        return <Upload className="w-5 h-5 text-blue-500" />;
-      case 'preprocess':
-        return <FileText className="w-5 h-5 text-violet-500" />;
-      case 'register':
-        return <Database className="w-5 h-5 text-emerald-500" />;
-      default:
-        return <Clock className="w-5 h-5 text-gray-500" />;
+  const handleTaskClick = (taskId: string) => {
+    if (!authenticated) {
+      login();
+      return;
     }
+    navigate(`/task/${taskId}`);
   };
 
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const actionCards = [
-    {
-      title: 'Upload Data',
-      description: 'Add new images, audio, or video files',
-      icon: Upload,
-      color: 'from-blue-500 to-cyan-500',
-      action: () => navigate('/upload')
-    },
-    {
-      title: 'Preprocess Data',
-      description: 'Add metadata to your uploaded files',
-      icon: FileText,
-      color: 'from-violet-500 to-purple-500',
-      action: () => navigate('/preprocess')
-    },
-    {
-      title: 'Register IP',
-      description: 'Register your data as intellectual property',
-      icon: Database,
-      color: 'from-emerald-500 to-green-500',
-      action: () => navigate('/register')
-    },
-    {
-      title: 'View Leaderboard',
-      description: 'See how you rank among contributors',
-      icon: Award,
-      color: 'from-amber-500 to-orange-500',
-      action: () => navigate('/leaderboard')
-    },
-  ];
-
-  if (!user) {
-    navigate('/');
-    return null;
-  }
+  const filteredTasks = filter === 'all' 
+    ? availableTasks 
+    : availableTasks.filter(task => task.category.toLowerCase() === filter.toLowerCase());
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-6">
-      <div className="container mx-auto animate-fade-in">
-        <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
-        
-        {/* Stats Overview */}
-        <section className="mb-10">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <GlassMorphismCard className="animate-slide-up" style={{ animationDelay: '100ms' }}>
-              <div className="flex items-center gap-4">
-                <div className="bg-gradient-to-r from-blue-500 to-cyan-500 w-12 h-12 rounded-full flex items-center justify-center">
-                  <Award className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-sm">Total Points</p>
-                  <h3 className="text-2xl font-bold">
-                    <AnimatedNumber 
-                      value={user?.points || 0} 
-                      duration={1500}
-                    />
-                  </h3>
-                </div>
-              </div>
-            </GlassMorphismCard>
-            
-            <GlassMorphismCard className="animate-slide-up" style={{ animationDelay: '200ms' }}>
-              <div className="flex items-center gap-4">
-                <div className="bg-gradient-to-r from-violet-500 to-purple-500 w-12 h-12 rounded-full flex items-center justify-center">
-                  <User className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-sm">Trust Level</p>
-                  <h3 className="text-2xl font-bold">{user?.trustLevel}</h3>
-                </div>
-              </div>
-            </GlassMorphismCard>
-            
-            <GlassMorphismCard className="animate-slide-up" style={{ animationDelay: '300ms' }}>
-              <div className="flex items-center gap-4">
-                <div className="bg-gradient-to-r from-emerald-500 to-green-500 w-12 h-12 rounded-full flex items-center justify-center">
-                  <BarChart3 className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-sm">Account Type</p>
-                  <h3 className="text-2xl font-bold">{user?.isOrganization ? 'Organization' : 'Contributor'}</h3>
-                </div>
-              </div>
-            </GlassMorphismCard>
+    <div className="container mx-auto px-4 py-16">
+      <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+        {/* User stats card */}
+        <GlassMorphismCard className="lg:col-span-1">
+          <div className="flex items-center mb-4">
+            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mr-4">
+              <Award className="w-8 h-8 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold">{contributionStats.totalPoints}</h2>
+              <p className="text-muted-foreground">Total Points</p>
+            </div>
           </div>
-        </section>
+          
+          <div className="mb-6">
+            <div className="flex justify-between mb-1">
+              <span className="text-sm">Trust Level: {contributionStats.trustLevel}</span>
+              <span className="text-sm">{contributionStats.totalPoints}/{contributionStats.nextLevel.pointsRequired}</span>
+            </div>
+            <Progress value={(contributionStats.totalPoints / contributionStats.nextLevel.pointsRequired) * 100} className="h-2" />
+            <p className="text-xs text-muted-foreground mt-1">
+              {contributionStats.nextLevel.pointsRemaining} more points to reach {contributionStats.nextLevel.name} level
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-background p-3 rounded-lg text-center">
+              <p className="text-2xl font-bold">{contributionStats.uploads}</p>
+              <p className="text-xs text-muted-foreground">Uploads</p>
+            </div>
+            <div className="bg-background p-3 rounded-lg text-center">
+              <p className="text-2xl font-bold">{contributionStats.preprocessing}</p>
+              <p className="text-xs text-muted-foreground">Labeled</p>
+            </div>
+            <div className="bg-background p-3 rounded-lg text-center">
+              <p className="text-2xl font-bold">{contributionStats.verified}</p>
+              <p className="text-xs text-muted-foreground">Verified</p>
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="font-semibold mb-3">Recent Activity</h3>
+            <div className="space-y-3">
+              <div className="flex items-center text-sm">
+                <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
+                <p>Uploaded 3 images to "Oil Spill Detection" - 2 days ago</p>
+              </div>
+              <div className="flex items-center text-sm">
+                <Database className="w-4 h-4 mr-2 text-muted-foreground" />
+                <p>Labeled 5 images with metadata - 3 days ago</p>
+              </div>
+              <div className="flex items-center text-sm">
+                <Shield className="w-4 h-4 mr-2 text-muted-foreground" />
+                <p>Registered IP for wildlife dataset - 1 week ago</p>
+              </div>
+            </div>
+          </div>
+        </GlassMorphismCard>
         
-        {/* Actions Grid */}
-        <section className="mb-10">
-          <h2 className="text-2xl font-bold mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {actionCards.map((card, index) => (
-              <GlassMorphismCard
-                key={index}
-                hoverEffect={true}
-                className="h-full cursor-pointer animate-slide-up"
-                style={{ animationDelay: `${(index + 3) * 100}ms` }}
-                onClick={card.action}
+        {/* Available tasks */}
+        <div className="lg:col-span-2">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold">Available Tasks</h2>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <select 
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="text-sm border-none bg-background rounded-md"
               >
-                <div className={cn(
-                  "w-12 h-12 rounded-full flex items-center justify-center mb-4 bg-gradient-to-r",
-                  card.color
-                )}>
-                  <card.icon className="w-6 h-6 text-white" />
+                <option value="all">All Categories</option>
+                <option value="environmental">Environmental</option>
+                <option value="automotive">Automotive</option>
+                <option value="wildlife">Wildlife</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filteredTasks.map(task => (
+              <GlassMorphismCard 
+                key={task.id}
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                hoverEffect={true}
+                onClick={() => handleTaskClick(task.id)}
+              >
+                <div className="h-40 mb-4 rounded-lg overflow-hidden">
+                  <img 
+                    src={task.image} 
+                    alt={task.title} 
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-                <h3 className="text-xl font-bold mb-2">{card.title}</h3>
-                <p className="text-muted-foreground">{card.description}</p>
+                
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                    {task.category}
+                  </span>
+                  <span className="text-xs font-medium bg-secondary/10 text-secondary px-2 py-0.5 rounded-full">
+                    {task.difficulty}
+                  </span>
+                </div>
+                
+                <h3 className="text-lg font-bold mb-2">{task.title}</h3>
+                <p className="text-sm text-muted-foreground mb-4">{task.description}</p>
+                
+                <div className="flex justify-between text-sm mb-3">
+                  <div className="flex items-center gap-1">
+                    <Award className="w-4 h-4 text-amber-500" />
+                    <span>{task.pointsPerUpload}+{task.pointsPerLabel} pts</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                    <span>Due: {task.deadline}</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="flex justify-between mb-1 text-xs">
+                    <span>Progress</span>
+                    <span>{task.progress}%</span>
+                  </div>
+                  <Progress value={task.progress} className="h-1.5" />
+                </div>
               </GlassMorphismCard>
             ))}
           </div>
-        </section>
-        
-        {/* Recent Activity */}
-        <section>
-          <h2 className="text-2xl font-bold mb-4">Recent Activity</h2>
-          <GlassMorphismCard className="animate-slide-up" style={{ animationDelay: '700ms' }}>
-            {isLoading ? (
-              <div className="flex justify-center items-center py-10">
-                <div className="animate-pulse-subtle">Loading recent activity...</div>
-              </div>
-            ) : recentActivity.length > 0 ? (
-              <ul className="divide-y divide-border">
-                {recentActivity.map((activity) => (
-                  <li key={activity.id} className="py-4 first:pt-0 last:pb-0">
-                    <div className="flex items-center gap-4">
-                      <div className="p-2 rounded-full bg-secondary">
-                        {getActivityIcon(activity.type)}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{activity.description}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatTimestamp(activity.timestamp)}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                          +{activity.points} pts
-                        </span>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No recent activity found</p>
-                <button 
-                  onClick={() => navigate('/upload')}
-                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-full text-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add New Activity
-                </button>
-              </div>
-            )}
-          </GlassMorphismCard>
-        </section>
+        </div>
       </div>
+      
+      {/* Recent contributions */}
+      <GlassMorphismCard>
+        <h2 className="text-xl font-bold mb-4">Your Contributions</h2>
+        
+        {contributionStats.uploads > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="bg-background p-4 rounded-lg flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                <Upload className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-medium">Oil Spill Dataset</h3>
+                <p className="text-sm text-muted-foreground">3 images uploaded</p>
+                <div className="flex items-center gap-1 mt-1 text-xs text-green-600">
+                  <CheckCircle className="w-3 h-3" />
+                  <span>Verified</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-background p-4 rounded-lg flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                <Database className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="font-medium">Flat Tire Recognition</h3>
+                <p className="text-sm text-muted-foreground">5 images labeled</p>
+                <div className="flex items-center gap-1 mt-1 text-xs text-green-600">
+                  <CheckCircle className="w-3 h-3" />
+                  <span>Verified</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-background p-4 rounded-lg flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-medium">Wildlife Dataset</h3>
+                <p className="text-sm text-muted-foreground">IP registered</p>
+                <div className="flex items-center gap-1 mt-1 text-xs text-amber-600">
+                  <Clock className="w-3 h-3" />
+                  <span>Pending</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">No contributions yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Start by uploading data for available tasks to earn points and rewards.
+            </p>
+            <button
+              onClick={() => navigate('/task/oil-spills')}
+              className="px-4 py-2 bg-primary text-white rounded-md"
+            >
+              Start Contributing
+            </button>
+          </div>
+        )}
+      </GlassMorphismCard>
     </div>
   );
 };

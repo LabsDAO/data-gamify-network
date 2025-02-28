@@ -1,7 +1,9 @@
 
 import { useState, useEffect, createContext, useContext } from 'react';
+import { usePrivy } from '@privy-io/react-auth';
+import { toast } from '@/components/ui/use-toast';
 
-// This is a mock auth service that would be replaced with Privy.io integration
+// This is a mock auth service with Privy integration
 type User = {
   id: string;
   username: string;
@@ -16,6 +18,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (username: string, password: string, isOrganization: boolean) => Promise<void>;
+  handlePrivyLogin: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,6 +44,7 @@ const mockUsers: User[] = [
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { login: privyLogin, authenticated, ready, user: privyUser } = usePrivy();
 
   useEffect(() => {
     // Check for stored user on mount
@@ -50,6 +54,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    // When Privy authenticates the user, update our local state
+    if (ready && authenticated && privyUser) {
+      // In a real implementation, you'd fetch user data from your backend
+      // For now, create a basic user profile
+      const newUser: User = {
+        id: privyUser.id || `privy_${Date.now()}`,
+        username: privyUser.email?.address || `user_${Date.now().toString().slice(-4)}`,
+        trustLevel: 'Newcomer',
+        points: 0,
+        isOrganization: false,
+      };
+      
+      setUser(newUser);
+      localStorage.setItem('labsmarket_user', JSON.stringify(newUser));
+      toast({
+        title: "Authentication successful",
+        description: "Welcome to LabsMarket.ai!",
+      });
+    }
+  }, [ready, authenticated, privyUser]);
+
+  const handlePrivyLogin = () => {
+    privyLogin();
+  };
 
   const login = async (username: string, password: string) => {
     setIsLoading(true);
@@ -111,6 +141,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         login,
         logout,
         register,
+        handlePrivyLogin,
       }}
     >
       {children}

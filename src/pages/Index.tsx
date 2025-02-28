@@ -5,15 +5,32 @@ import { ArrowRight, Upload, Database, Award, Shield, BarChart3 } from 'lucide-r
 import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { usePrivy } from '@privy-io/react-auth';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, handlePrivyLogin } = useAuth();
+  const { authenticated } = usePrivy();
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
+
+  useEffect(() => {
+    // Redirect to dashboard if already authenticated
+    if (authenticated && user) {
+      navigate('/dashboard');
+    }
+  }, [authenticated, user, navigate]);
+
+  const handleGetStarted = () => {
+    if (user) {
+      navigate('/dashboard');
+    } else {
+      handlePrivyLogin();
+    }
+  };
 
   const features = [
     {
@@ -71,7 +88,7 @@ const Index = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <button 
-              onClick={() => navigate(user ? '/dashboard' : '/dashboard')} 
+              onClick={handleGetStarted} 
               className="px-8 py-3 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-lg hover:shadow-xl hover:translate-y-[-2px]"
             >
               {user ? 'Go to Dashboard' : 'Get Started'} 
@@ -129,7 +146,7 @@ const Index = () => {
               Join our community of trusted contributors and start monetizing your data while advancing AI technology.
             </p>
             <button 
-              onClick={() => navigate(user ? '/dashboard' : '/dashboard')}
+              onClick={handleGetStarted}
               className="px-8 py-3 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all mx-auto shadow-lg hover:shadow-xl hover:translate-y-[-2px]"
             >
               {user ? 'Go to Dashboard' : 'Join Now'}
