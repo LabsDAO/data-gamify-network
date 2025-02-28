@@ -30,6 +30,9 @@ const App = () => (
             accentColor: "#6366F1",
             logo: "https://your-app-logo.png", // Replace with your actual logo
           },
+          embeddedWallets: {
+            createOnLogin: 'users-without-wallets',
+          },
         }}
       >
         <AuthProvider>

@@ -10,6 +10,7 @@ type User = {
   trustLevel: 'Newcomer' | 'Contributor' | 'Expert';
   points: number;
   isOrganization: boolean;
+  walletAddress?: string;
 };
 
 interface AuthContextType {
@@ -19,6 +20,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   register: (username: string, password: string, isOrganization: boolean) => Promise<void>;
   handlePrivyLogin: () => void;
+  addPoints: (points: number) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,7 +46,7 @@ const mockUsers: User[] = [
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { login: privyLogin, authenticated, ready, user: privyUser } = usePrivy();
+  const { login: privyLogin, authenticated, ready, user: privyUser, logout: privyLogout } = usePrivy();
 
   useEffect(() => {
     // Check for stored user on mount
@@ -66,6 +68,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         trustLevel: 'Newcomer',
         points: 0,
         isOrganization: false,
+        walletAddress: privyUser.wallet?.address,
       };
       
       setUser(newUser);
@@ -126,10 +129,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 300));
       
+      // Also logout from Privy
+      if (authenticated) {
+        await privyLogout();
+      }
+      
       setUser(null);
       localStorage.removeItem('labsmarket_user');
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  const addPoints = (points: number) => {
+    if (user) {
+      const updatedUser = { 
+        ...user, 
+        points: user.points + points,
+        trustLevel: user.points + points > 500 ? 'Contributor' : user.points + points > 1000 ? 'Expert' : 'Newcomer'
+      };
+      setUser(updatedUser);
+      localStorage.setItem('labsmarket_user', JSON.stringify(updatedUser));
     }
   };
 
@@ -142,6 +162,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         logout,
         register,
         handlePrivyLogin,
+        addPoints,
       }}
     >
       {children}

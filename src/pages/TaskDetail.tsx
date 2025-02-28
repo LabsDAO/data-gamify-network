@@ -1,12 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Upload, Tag, Clock, Award, CheckCircle, XCircle } from 'lucide-react';
+import { Upload, Tag, Clock, Award, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { usePrivy } from '@privy-io/react-auth';
+import { Badge } from '@/components/ui/badge';
 
 // Mock task data
 const tasksMockData = {
@@ -49,16 +50,36 @@ const tasksMockData = {
 const TaskDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, addPoints } = useAuth();
   const { authenticated, login } = usePrivy();
   
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [labels, setLabels] = useState<string>('');
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [showAuthReminder, setShowAuthReminder] = useState(false);
   
   // Get task data based on ID
   const task = id ? tasksMockData[id as keyof typeof tasksMockData] : null;
+  
+  useEffect(() => {
+    // Show auth reminder after 2 seconds if not authenticated
+    if (!authenticated && !user) {
+      const timer = setTimeout(() => {
+        setShowAuthReminder(true);
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [authenticated, user]);
+  
+  useEffect(() => {
+    // Clean up preview URLs when component unmounts
+    return () => {
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [previewUrls]);
   
   if (!task) {
     return (
@@ -78,12 +99,22 @@ const TaskDetail = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
+      
+      // Create preview URLs for images
+      const newPreviewUrls = selectedFiles.map(file => {
+        if (file.type.startsWith('image/')) {
+          return URL.createObjectURL(file);
+        }
+        return '';
+      });
+      
       setFiles(prev => [...prev, ...selectedFiles]);
+      setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
     }
   };
   
   const handleUpload = async () => {
-    if (!authenticated) {
+    if (!authenticated && !user) {
       toast({
         title: "Authentication required",
         description: "Please log in to upload files",
@@ -115,13 +146,14 @@ const TaskDetail = () => {
         clearInterval(interval);
         setTimeout(() => {
           setUploading(false);
-          setFiles([]);
-          setLabels('');
           
           // Calculate points earned
           const pointsEarned = task.pointsPerUpload * files.length;
           const labelPoints = labels.trim() ? task.pointsPerLabel : 0;
           const totalPoints = pointsEarned + labelPoints;
+          
+          // Add points to user account
+          addPoints(totalPoints);
           
           toast({
             title: "Upload successful!",
@@ -129,13 +161,25 @@ const TaskDetail = () => {
             variant: "success"
           });
           
+          // Clear form
+          setFiles([]);
+          setLabels('');
+          setPreviewUrls([]);
+          setUploadProgress(0);
+          
         }, 500);
       }
     }, 300);
   };
   
   const handleRemoveFile = (index: number) => {
+    // Revoke object URL to prevent memory leaks
+    if (previewUrls[index]) {
+      URL.revokeObjectURL(previewUrls[index]);
+    }
+    
     setFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
   
   const totalPointsPossible = task.pointsPerUpload + task.pointsPerLabel;
@@ -152,9 +196,9 @@ const TaskDetail = () => {
         
         <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
           <div>
-            <span className="text-sm font-medium text-primary/80 bg-primary/10 px-3 py-1 rounded-full">
+            <Badge variant="outline" className="bg-primary/10 text-primary mb-2">
               {task.category}
-            </span>
+            </Badge>
             <h1 className="text-3xl font-bold mt-2 mb-3">{task.title}</h1>
             <p className="text-muted-foreground mb-4">{task.description}</p>
             
@@ -175,6 +219,24 @@ const TaskDetail = () => {
           </div>
         </div>
       </div>
+      
+      {showAuthReminder && !authenticated && !user && (
+        <GlassMorphismCard className="mb-8 border-amber-200">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-6 h-6 text-amber-500 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="font-semibold text-amber-700">Authentication Required</h3>
+              <p className="text-muted-foreground mb-4">Sign in to start uploading data and earning points for your contributions.</p>
+              <button 
+                onClick={login}
+                className="px-4 py-2 bg-primary text-white rounded-md"
+              >
+                Sign In with Privy
+              </button>
+            </div>
+          </div>
+        </GlassMorphismCard>
+      )}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
@@ -212,9 +274,9 @@ const TaskDetail = () => {
                     <div key={index} className="flex items-center justify-between bg-background p-3 rounded-md">
                       <div className="flex items-center gap-2">
                         <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center">
-                          {file.type.startsWith('image/') ? (
+                          {file.type.startsWith('image/') && previewUrls[index] ? (
                             <img 
-                              src={URL.createObjectURL(file)} 
+                              src={previewUrls[index]} 
                               alt="preview" 
                               className="w-10 h-10 object-cover rounded"
                             />
