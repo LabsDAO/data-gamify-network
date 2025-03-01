@@ -69,14 +69,19 @@ const TaskDetail = () => {
   
   const task = id ? tasksMockData[id as keyof typeof tasksMockData] : null;
   
+  const uploadPath = id ? `${id}/` : 'uploads/';
+  
   const { 
     uploadFile: uploadToOort, 
     isUploading: isOortUploading,
-    progress: oortProgress
+    progress: oortProgress,
+    isUsingRealStorage
   } = useOortStorage({
     onProgress: (progress) => {
       setUploadProgress(progress);
-    }
+    },
+    path: uploadPath,
+    forceReal: true
   });
   
   useEffect(() => {
@@ -163,27 +168,13 @@ const TaskDetail = () => {
         const file = files[i];
         
         toast({
-          title: `Uploading file ${i + 1} of ${files.length}`,
+          title: `Uploading file ${i + 1} of ${files.length} to OORT labsmarket bucket`,
           description: file.name,
         });
         
         let uploadedUrl;
         
-        if (storageOption === "oort") {
-          uploadedUrl = await uploadToOort(file);
-        } else if (storageOption === "aws") {
-          toast({
-            title: "AWS S3 credentials not configured",
-            description: "Using OORT Storage as fallback",
-          });
-          uploadedUrl = await uploadToOort(file);
-        } else if (storageOption === "azure") {
-          toast({
-            title: "Azure Blob Storage credentials not configured",
-            description: "Using OORT Storage as fallback",
-          });
-          uploadedUrl = await uploadToOort(file);
-        }
+        uploadedUrl = await uploadToOort(file);
         
         if (uploadedUrl) {
           successfulUploads.push(uploadedUrl);
@@ -201,7 +192,7 @@ const TaskDetail = () => {
         
         toast({
           title: "Upload successful!",
-          description: `You've earned ${totalPoints} points for your contribution! Files stored on ${storageOption.toUpperCase()}.`,
+          description: `You've earned ${totalPoints} points for your contribution! Files stored in OORT labsmarket bucket.`,
           variant: "success"
         });
         
@@ -296,7 +287,7 @@ const TaskDetail = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <GlassMorphismCard className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Upload Images</h2>
+            <h2 className="text-xl font-semibold mb-4">Upload Images to OORT Cloud (labsmarket bucket)</h2>
             
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 mb-6 text-center">
               <Upload className="w-10 h-10 mx-auto mb-4 text-muted-foreground" />
@@ -434,7 +425,7 @@ const TaskDetail = () => {
             
             {uploadedUrls.length > 0 && (
               <div className="mt-6">
-                <h3 className="font-semibold mb-2">Uploaded Files</h3>
+                <h3 className="font-semibold mb-2">Uploaded Files (OORT labsmarket bucket)</h3>
                 <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-input rounded-md">
                   {uploadedUrls.map((url, index) => (
                     <div key={index} className="flex items-center justify-between p-2 bg-background/50 rounded">

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { 
   uploadToOortStorage, 
@@ -14,6 +14,7 @@ interface UseOortStorageOptions {
   onError?: (error: Error) => void;
   onProgress?: (progress: number) => void;
   path?: string;
+  forceReal?: boolean; // New option to force real storage
 }
 
 export function useOortStorage(options: UseOortStorageOptions = {}) {
@@ -21,6 +22,14 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<Error | null>(null);
   const [uploadUrl, setUploadUrl] = useState<string | null>(null);
+
+  // If forceReal is set, enable real storage on mount
+  useEffect(() => {
+    if (options.forceReal && !isUsingRealOortStorage()) {
+      setUseRealOortStorage(true);
+      console.log("OORT Storage: Forcing real storage mode");
+    }
+  }, [options.forceReal]);
 
   const uploadFile = async (file: File) => {
     if (!file) {
@@ -84,6 +93,11 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
         });
       }, 500);
       
+      // Enable real storage if the option is set
+      if (options.forceReal && !isUsingRealOortStorage()) {
+        setUseRealOortStorage(true);
+      }
+
       // Perform the actual upload
       const url = await uploadToOortStorage(file, options.path);
       

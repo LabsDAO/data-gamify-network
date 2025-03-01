@@ -27,6 +27,10 @@ const ALLOWED_FILE_TYPES = [
   'audio/mpeg', 'audio/wav', 'audio/ogg',
 ];
 
+// OORT Storage config
+const OORT_ENDPOINT = 'https://s3-standard.oortech.com';
+const OORT_BUCKET = 'labsmarket'; // Set the target bucket to labsmarket
+
 /**
  * Validate file before upload
  */
@@ -115,7 +119,7 @@ export const uploadToOortStorage = async (
     try {
       return new Promise((resolve) => {
         // Generate a realistic-looking URL for the demo without actually uploading
-        const demoUrl = `https://s3-standard.oortech.com/${fullPath}`;
+        const demoUrl = `${OORT_ENDPOINT}/${OORT_BUCKET}/${fullPath}`;
         
         // Simulate network delay
         setTimeout(() => {
@@ -133,9 +137,8 @@ export const uploadToOortStorage = async (
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       
-      // Set up the endpoint
-      const endpoint = 'https://s3-standard.oortech.com';
-      const uploadUrl = `${endpoint}/${fullPath}`;
+      // Set up the endpoint with the specific bucket
+      const uploadUrl = `${OORT_ENDPOINT}/${OORT_BUCKET}/${fullPath}`;
       
       console.log(`Uploading to: ${uploadUrl}`);
       
@@ -160,7 +163,7 @@ export const uploadToOortStorage = async (
       xhr.onload = function() {
         if (xhr.status >= 200 && xhr.status < 300) {
           // S3-compatible services typically return empty response for successful PUT
-          const fileUrl = `${endpoint}/${fullPath}`;
+          const fileUrl = `${OORT_ENDPOINT}/${OORT_BUCKET}/${fullPath}`;
           console.log('OORT Storage upload successful');
           resolve(fileUrl);
         } else {
