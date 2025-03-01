@@ -12,6 +12,49 @@ const DEFAULT_CREDENTIALS: StorageCredentials = {
   secretKey: "Od4PGAW31DORFBy9RtujPbzdRsXrxJbI22hCrGjp",
 };
 
+// File validation rules
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+const ALLOWED_FILE_TYPES = [
+  // Images
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+  // Documents
+  'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  // Data
+  'application/json', 'text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  // Video
+  'video/mp4', 'video/webm',
+  // Audio
+  'audio/mpeg', 'audio/wav', 'audio/ogg',
+];
+
+/**
+ * Validate file before upload
+ */
+export const validateFile = (file: File): { valid: boolean; error?: string } => {
+  // Check if file exists
+  if (!file) {
+    return { valid: false, error: 'No file selected' };
+  }
+  
+  // Check file size
+  if (file.size > MAX_FILE_SIZE) {
+    return { 
+      valid: false, 
+      error: `File size exceeds 100MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB)` 
+    };
+  }
+  
+  // Check file type
+  if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+    return { 
+      valid: false, 
+      error: `File type ${file.type || 'unknown'} is not supported` 
+    };
+  }
+  
+  return { valid: true };
+};
+
 /**
  * Get OORT Storage credentials from localStorage or use defaults
  */
@@ -49,6 +92,12 @@ export const uploadToOortStorage = async (
   file: File, 
   path: string = 'uploads/'
 ): Promise<string> => {
+  // Validate file first
+  const validation = validateFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+  
   const credentials = getOortCredentials();
   
   // Construct the full path including the filename with timestamp
@@ -113,3 +162,4 @@ export const uploadToOortStorage = async (
 export const resetToDefaultCredentials = (): void => {
   localStorage.removeItem('oort_credentials');
 };
+

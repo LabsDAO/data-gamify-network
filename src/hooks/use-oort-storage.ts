@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
-import { uploadToOortStorage, getOortCredentials } from '@/utils/oortStorage';
+import { uploadToOortStorage, validateFile, getOortCredentials } from '@/utils/oortStorage';
 
 interface UseOortStorageOptions {
   onSuccess?: (url: string) => void;
@@ -17,7 +17,41 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
   const [uploadUrl, setUploadUrl] = useState<string | null>(null);
 
   const uploadFile = async (file: File) => {
-    if (!file) return;
+    if (!file) {
+      const noFileError = new Error('No file selected');
+      setError(noFileError);
+      
+      if (options.onError) {
+        options.onError(noFileError);
+      }
+      
+      toast({
+        title: "Upload failed",
+        description: noFileError.message,
+        variant: "destructive",
+      });
+      
+      return;
+    }
+    
+    // Validate file before starting upload
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      const validationError = new Error(validation.error);
+      setError(validationError);
+      
+      if (options.onError) {
+        options.onError(validationError);
+      }
+      
+      toast({
+        title: "File validation failed",
+        description: validation.error,
+        variant: "destructive",
+      });
+      
+      return;
+    }
     
     setIsUploading(true);
     setProgress(0);
@@ -52,9 +86,21 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
                 resolve(uploadToOortStorage(file, options.path));
               }
             } else {
-              reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
+              // Enhanced error information
+              const errorMsg = `Upload failed with status ${xhr.status}${xhr.responseText ? ': ' + xhr.responseText : ''}`;
+              reject(new Error(errorMsg));
             }
           }
+        };
+        
+        // Add timeout handler
+        xhr.ontimeout = () => {
+          reject(new Error('Upload timed out. Please check your network connection and try again.'));
+        };
+        
+        // Add network error handler
+        xhr.onerror = () => {
+          reject(new Error('Network error occurred during upload. Please check your connection and try again.'));
         };
       });
       
@@ -71,6 +117,7 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
       toast({
         title: "Upload successful",
         description: `File uploaded to OORT Storage: ${file.name}`,
+        variant: "success",
       });
       
       return url;
@@ -82,9 +129,12 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
         options.onError(error);
       }
       
+      // Enhanced error toast with more information
+      const errorMessage = error.message || 'Upload failed. Please try again.';
+      
       toast({
         title: "Upload failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       
@@ -105,5 +155,6 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
     error,
     uploadUrl,
     isUsingDefaultCredentials,
+    validateFile: (file: File) => validateFile(file), // Expose validation function
   };
 }
