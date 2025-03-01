@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePrivy } from '@privy-io/react-auth';
@@ -167,19 +168,21 @@ const Contribute = () => {
 
   return (
     <div className={`container mx-auto px-4 ${isMobile ? 'pt-20 pb-8' : 'py-16'}`}>
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-bold">Contribute to Datasets</h1>
           <p className="text-muted-foreground mt-2">Find tasks to contribute to and earn points</p>
         </div>
         
-        <Button 
-          onClick={() => navigate('/request')}
-          className="flex items-center gap-2"
-        >
-          <Database className="w-4 h-4" />
-          Request New Challenge
-        </Button>
+        <div className="self-center">
+          <Button 
+            onClick={() => navigate('/request')}
+            className="flex items-center gap-2"
+          >
+            <Database className="w-4 h-4" />
+            Request New Challenge
+          </Button>
+        </div>
       </div>
       
       {/* Search and filters */}
