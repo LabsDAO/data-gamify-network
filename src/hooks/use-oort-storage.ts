@@ -23,9 +23,9 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
   const [error, setError] = useState<Error | null>(null);
   const [uploadUrl, setUploadUrl] = useState<string | null>(null);
 
-  // If forceReal is set, enable real storage on mount
+  // Always enable real storage if forced, even on mount
   useEffect(() => {
-    if (options.forceReal && !isUsingRealOortStorage()) {
+    if (options.forceReal) {
       setUseRealOortStorage(true);
       console.log("OORT Storage: Forcing real storage mode");
     }
@@ -94,7 +94,7 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
       }, 500);
       
       // Enable real storage if the option is set
-      if (options.forceReal && !isUsingRealOortStorage()) {
+      if (options.forceReal) {
         setUseRealOortStorage(true);
       }
 

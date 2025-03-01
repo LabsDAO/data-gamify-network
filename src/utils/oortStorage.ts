@@ -1,4 +1,3 @@
-
 // OORT Storage integration utility
 
 type StorageCredentials = {
@@ -147,17 +146,16 @@ export const uploadToOortStorage = async (
       // Set proper content type based on file type
       xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
       
-      // Set S3-compatible authentication headers
-      // Note: This is a simplified version of S3 auth, for full implementation
-      // proper signature calculation is needed
-      xhr.setRequestHeader('X-Amz-Content-Sha256', 'UNSIGNED-PAYLOAD');
-      xhr.setRequestHeader('X-Amz-Date', new Date().toISOString().replace(/[:\-]|\.\d{3}/g, ''));
-      xhr.setRequestHeader('Authorization', `AWS4-HMAC-SHA256 Credential=${credentials.accessKey}`);
-      
-      // Add custom OORT headers if they are supported
-      // This is a fallback in case the S3-compatible headers don't work
+      // Setup proper OORT authentication headers
+      // Add custom OORT headers with the access and secret keys directly
       xhr.setRequestHeader('X-OORT-ACCESS-KEY', credentials.accessKey);
       xhr.setRequestHeader('X-OORT-SECRET-KEY', credentials.secretKey);
+      
+      // Also try the standard S3 authentication approach (tokens in headers)
+      xhr.setRequestHeader('Authorization', `Bearer ${credentials.accessKey}:${credentials.secretKey}`);
+      
+      // Try also with different token format
+      xhr.setRequestHeader('x-amz-token', `${credentials.accessKey}:${credentials.secretKey}`);
       
       // Handle completion
       xhr.onload = function() {
