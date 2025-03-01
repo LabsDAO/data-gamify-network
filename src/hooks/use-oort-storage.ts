@@ -31,7 +31,7 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
         variant: "destructive",
       });
       
-      return;
+      return null;
     }
     
     // Validate file before starting upload
@@ -50,7 +50,7 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
         variant: "destructive",
       });
       
-      return;
+      return null;
     }
     
     setIsUploading(true);
@@ -58,56 +58,38 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
     setError(null);
     setUploadUrl(null);
     
+    // Simulate initial progress for better UX
+    setProgress(5);
+    if (options.onProgress) {
+      options.onProgress(5);
+    }
+    
     try {
-      // For actual API implementation, we'd use XMLHttpRequest for progress tracking
-      // instead of fetch, as fetch doesn't provide upload progress events
-      const xhr = new XMLHttpRequest();
-      
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const percentage = Math.round((event.loaded / event.total) * 100);
-          setProgress(percentage);
+      // For actual upload we're using XMLHttpRequest for progress tracking in the uploadToOortStorage function
+      // But here we'll simulate progress updates during the upload for better UX
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          // Don't go above 90% until we get actual completion
+          const newProgress = Math.min(prev + Math.random() * 10, 90);
           if (options.onProgress) {
-            options.onProgress(percentage);
+            options.onProgress(newProgress);
           }
-        }
-      });
+          return newProgress;
+        });
+      }, 500);
       
-      // Create a promise to handle the XHR response
-      const uploadPromise = new Promise<string>((resolve, reject) => {
-        xhr.onreadystatechange = () => {
-          if (xhr.readyState === 4) {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              try {
-                const response = JSON.parse(xhr.responseText);
-                resolve(response.url);
-              } catch (e) {
-                // If the response isn't JSON or doesn't have a URL, fall back to direct upload method
-                resolve(uploadToOortStorage(file, options.path));
-              }
-            } else {
-              // Enhanced error information
-              const errorMsg = `Upload failed with status ${xhr.status}${xhr.responseText ? ': ' + xhr.responseText : ''}`;
-              reject(new Error(errorMsg));
-            }
-          }
-        };
-        
-        // Add timeout handler
-        xhr.ontimeout = () => {
-          reject(new Error('Upload timed out. Please check your network connection and try again.'));
-        };
-        
-        // Add network error handler
-        xhr.onerror = () => {
-          reject(new Error('Network error occurred during upload. Please check your connection and try again.'));
-        };
-      });
+      // Perform the actual upload
+      const url = await uploadToOortStorage(file, options.path);
       
-      // If XHR is not supported or fails, fall back to the direct upload method
-      const url = await uploadPromise.catch(() => uploadToOortStorage(file, options.path));
+      // Clear the progress interval
+      clearInterval(progressInterval);
       
+      // Set progress to 100% on success
       setProgress(100);
+      if (options.onProgress) {
+        options.onProgress(100);
+      }
+      
       setUploadUrl(url);
       
       if (options.onSuccess) {
@@ -139,6 +121,7 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
       });
       
       console.error("OORT Storage upload error:", error);
+      return null;
     } finally {
       setIsUploading(false);
     }
