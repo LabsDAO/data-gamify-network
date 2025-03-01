@@ -29,7 +29,12 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
       setUseRealOortStorage(true);
       console.log("OORT Storage: Forcing real storage mode");
     }
-  }, [options.forceReal]);
+    
+    // If a path is provided, log it for debugging
+    if (options.path) {
+      console.log(`OORT Storage initialized with path: ${options.path}`);
+    }
+  }, [options.forceReal, options.path]);
 
   const uploadFile = async (file: File) => {
     if (!file) {
@@ -49,11 +54,16 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
       return null;
     }
     
+    // Log file info for debugging
+    console.log(`Preparing to upload to OORT: ${file.name} (${file.size} bytes, type: ${file.type})`);
+    
     // Validate file before starting upload
     const validation = validateFile(file);
     if (!validation.valid) {
-      const validationError = new Error(validation.error);
+      const validationError = new Error(validation.error || 'File validation failed');
       setError(validationError);
+      
+      console.error(`File validation failed: ${validation.error}`);
       
       if (options.onError) {
         options.onError(validationError);
@@ -98,11 +108,18 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
         setUseRealOortStorage(true);
       }
 
+      // Log the upload path for debugging
+      const uploadPath = options.path || 'uploads/';
+      console.log(`Starting upload to OORT with path: ${uploadPath}`);
+
       // Perform the actual upload
-      const url = await uploadToOortStorage(file, options.path);
+      const url = await uploadToOortStorage(file, uploadPath);
       
       // Clear the progress interval
       clearInterval(progressInterval);
+      
+      // Log the successful upload URL
+      console.log(`OORT upload successful to ${url}`);
       
       // Set progress to 100% on success
       setProgress(100);
@@ -143,7 +160,7 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
       console.error("OORT Storage upload error:", error);
       return null;
     } finally {
-      setIsUploading(false); // Fixed: changed setUploading to setIsUploading
+      setIsUploading(false);
     }
   };
 

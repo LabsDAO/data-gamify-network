@@ -76,7 +76,7 @@ const TaskDetail = () => {
   
   const task = id ? tasksMockData[id as keyof typeof tasksMockData] : null;
   
-  const uploadPath = id ? `${id}/` : 'uploads/';
+  const uploadPath = id ? `${id}` : 'uploads';
   
   console.log(`TaskDetail: Setting upload path for task ${id} to "${uploadPath}"`);
   
@@ -146,6 +146,10 @@ const TaskDetail = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
+      
+      selectedFiles.forEach(file => {
+        console.log(`Selected file: ${file.name}, size: ${file.size} bytes, type: ${file.type}`);
+      });
       
       const newPreviewUrls = selectedFiles.map(file => {
         if (file.type.startsWith('image/')) {
@@ -224,24 +228,6 @@ const TaskDetail = () => {
       return;
     }
     
-    if (storageOption === "aws" && (!connectionStatus.tested || !connectionStatus.isValid)) {
-      toast({
-        title: "Testing AWS S3 connection",
-        description: "Verifying AWS S3 connection before upload...",
-      });
-      
-      const testResult = await testConnection();
-      if (!testResult.success) {
-        toast({
-          title: "AWS S3 connection issues",
-          description: "Please fix AWS S3 connectivity issues before uploading. See details below.",
-          variant: "destructive"
-        });
-        setShowConnectionTest(true);
-        return;
-      }
-    }
-    
     setUploading(true);
     setUploadProgress(0);
     setUploadedUrls([]);
@@ -252,6 +238,8 @@ const TaskDetail = () => {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         
+        console.log(`Processing file ${i + 1} of ${files.length}: ${file.name}`);
+        
         const uploadPathMessage = storageOption === "aws" 
           ? `to AWS S3 (${uploadPath})` 
           : `to OORT labsmarket bucket (${uploadPath})`;
@@ -260,8 +248,6 @@ const TaskDetail = () => {
           title: `Uploading file ${i + 1} of ${files.length} ${uploadPathMessage}`,
           description: file.name,
         });
-        
-        console.log(`Uploading file ${file.name} with path: ${uploadPath}`);
         
         let uploadedUrl;
         
@@ -283,16 +269,18 @@ const TaskDetail = () => {
         if (uploadedUrl) {
           console.log(`Upload success, URL: ${uploadedUrl}`);
           successfulUploads.push(uploadedUrl);
+        } else {
+          console.error(`Upload failed for file: ${file.name}`);
         }
       }
       
       setUploadedUrls(successfulUploads);
       
-      const pointsEarned = task!.pointsPerUpload * successfulUploads.length;
-      const labelPoints = labels.trim() ? task!.pointsPerLabel : 0;
-      const totalPoints = pointsEarned + labelPoints;
-      
       if (successfulUploads.length > 0) {
+        const pointsEarned = task ? task.pointsPerUpload * successfulUploads.length : 0;
+        const labelPoints = labels.trim() && task ? task.pointsPerLabel : 0;
+        const totalPoints = pointsEarned + labelPoints;
+        
         addPoints(totalPoints);
         
         toast({
@@ -458,8 +446,7 @@ const TaskDetail = () => {
               </p>
             </div>
             
-            {
-              files.length > 0 && (
+            {files.length > 0 && (
               <div className="mb-6">
                 <h3 className="font-semibold mb-2">Selected Files ({files.length})</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto p-2">
@@ -678,7 +665,7 @@ const TaskDetail = () => {
             
             {uploading && (
               <div className="mb-6">
-                <p className="text-sm font-medium mb-2">Uploading... {uploadProgress}%</p>
+                <p className="text-sm font-medium mb-2">Uploading... {uploadProgress.toFixed(0)}%</p>
                 <Progress value={uploadProgress} className="h-2" />
               </div>
             )}

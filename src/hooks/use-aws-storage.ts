@@ -49,7 +49,12 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       setUseRealAwsStorage(true);
       console.log("AWS S3 Storage: Using real storage mode by default");
     }
-  }, [options.forceReal]);
+    
+    // If a path is provided, log it for debugging
+    if (options.path) {
+      console.log(`AWS Storage initialized with path: ${options.path}`);
+    }
+  }, [options.forceReal, options.path]);
 
   // Fetch available buckets - with graceful fallback for Lovable environment
   const fetchAvailableBuckets = async () => {
@@ -271,6 +276,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
 
   // Upload file function with improved error handling
   const uploadFile = async (file: File) => {
+    // Validate file exists
     if (!file) {
       const noFileError = new Error('No file selected');
       setError(noFileError);
@@ -282,6 +288,30 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       toast({
         title: "Upload failed",
         description: noFileError.message,
+        variant: "destructive",
+      });
+      
+      return null;
+    }
+    
+    // Log file info for debugging
+    console.log(`Preparing to upload file: ${file.name} (${file.size} bytes, type: ${file.type})`);
+    
+    // Validate file before starting upload
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      const validationError = new Error(validation.error || 'File validation failed');
+      setError(validationError);
+      
+      console.error(`File validation failed: ${validation.error}`);
+      
+      if (options.onError) {
+        options.onError(validationError);
+      }
+      
+      toast({
+        title: "File validation failed",
+        description: validation.error,
         variant: "destructive",
       });
       
@@ -307,25 +337,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       return null;
     }
     
-    // Validate file before starting upload
-    const validation = validateFile(file);
-    if (!validation.valid) {
-      const validationError = new Error(validation.error);
-      setError(validationError);
-      
-      if (options.onError) {
-        options.onError(validationError);
-      }
-      
-      toast({
-        title: "File validation failed",
-        description: validation.error,
-        variant: "destructive",
-      });
-      
-      return null;
-    }
-    
+    // Prepare for upload
     setIsUploading(true);
     setProgress(0);
     setError(null);
@@ -337,45 +349,30 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       options.onProgress(5);
     }
     
-    try {
-      // Check if we're using default credentials in Lovable environment
-      const isDefaultCredentialsInLovable = 
-        credentials.accessKeyId === "AKIAXZ5NGJRVYNNHVYFG" && 
-        credentials.bucket === "labsmarket";
-      
-      // Test connection prior to uploading (but skip for default credentials in Lovable or if already tested)
-      if (!isDefaultCredentialsInLovable && (!connectionStatus.tested || !connectionStatus.isValid)) {
-        toast({
-          title: "Testing AWS S3 connection",
-          description: "Verifying AWS S3 connectivity before uploading...",
-        });
-        
-        const testResult = await testConnection();
-        if (!testResult.success) {
-          throw new Error(`AWS S3 connectivity check failed: ${testResult.message}`);
+    // Use a progress interval to simulate progress since AWS SDK doesn't provide progress events
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        const newProgress = Math.min(prev + Math.random() * 5, 90);
+        if (options.onProgress) {
+          options.onProgress(newProgress);
         }
-      } else if (isDefaultCredentialsInLovable) {
-        console.log("Using optimized upload path for Lovable environment with default credentials");
-      }
-      
-      // Use a progress interval to update the UI during upload
-      // Since AWS SDK v3 Upload doesn't provide progress events in browser
-      const progressInterval = setInterval(() => {
-        setProgress(prev => {
-          const newProgress = Math.min(prev + Math.random() * 5, 90);
-          if (options.onProgress) {
-            options.onProgress(newProgress);
-          }
-          return newProgress;
-        });
-      }, 300);
+        return newProgress;
+      });
+    }, 300);
+    
+    try {
+      // Log the upload path for debugging
+      const uploadPath = options.path || 'uploads/';
+      console.log(`Starting upload of ${file.name} to AWS S3 bucket ${credentials.bucket} with path: ${uploadPath}`);
       
       // Perform the actual AWS S3 upload
-      console.log(`Starting upload of ${file.name} to AWS S3 with path: ${options.path || 'uploads/'}`);
-      const url = await uploadToAwsS3(file, options.path);
+      const url = await uploadToAwsS3(file, uploadPath);
       
       // Clear the progress interval
       clearInterval(progressInterval);
+      
+      // Log the successful upload URL
+      console.log(`Upload successful to ${url}`);
       
       // Set progress to 100% on success
       setProgress(100);
@@ -397,8 +394,14 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       
       return url;
     } catch (err) {
+      // Clear the progress interval
+      clearInterval(progressInterval);
+      
       const error = err instanceof Error ? err : new Error('Unknown error during upload');
+      console.error("AWS S3 upload error:", error);
+      
       setError(error);
+      setProgress(0);
       
       if (options.onError) {
         options.onError(error);
@@ -410,7 +413,6 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
         variant: "destructive",
       });
       
-      console.error("AWS S3 upload error:", error);
       return null;
     } finally {
       setIsUploading(false);
@@ -419,7 +421,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
 
   // Get credential status
   const credentials = getAwsCredentials();
-  const hasValidCredentials = credentials.accessKeyId !== "" && credentials.secretAccessKey !== "";
+  const hasValidCredentials = Boolean(getAwsCredentials().accessKeyId && getAwsCredentials().secretAccessKey); 
   const isUsingCustomCredentials = isUsingCustomAwsCredentials();
   
   // Get storage mode (real or simulated)
@@ -455,15 +457,9 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       
       // Save the new credentials
       const updatedCreds = {
-        ...credentials,
+        ...getAwsCredentials(),
         ...newCredentials
       };
-      
-      // Special handling for default credentials in Lovable
-      const isDefaultCredentialsInLovable = 
-        newCredentials.accessKeyId === "AKIAXZ5NGJRVYNNHVYFG" && 
-        newCredentials.secretAccessKey === "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" &&
-        newCredentials.bucket === "labsmarket";
       
       // Save credentials to localStorage
       saveAwsCredentials(updatedCreds);
@@ -471,38 +467,6 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       // Force a real storage mode
       setUseRealAwsStorage(true);
       
-      if (isDefaultCredentialsInLovable) {
-        console.log("Using optimized path for default credentials in Lovable");
-        
-        // Immediately update connection status without testing
-        setConnectionStatus({
-          tested: true,
-          isValid: true,
-          details: {
-            credentialsValid: true,
-            bucketAccessible: true,
-            writePermission: true,
-            corsEnabled: true,
-            availableBuckets: ["labsmarket"]
-          },
-          message: "AWS S3 connection successful! Ready to upload."
-        });
-        
-        setAvailableBuckets(["labsmarket"]);
-        
-        return {
-          success: true,
-          message: "AWS S3 connection successful! Ready to upload.",
-          details: {
-            credentialsValid: true,
-            bucketAccessible: true,
-            writePermission: true,
-            corsEnabled: true
-          }
-        };
-      }
-      
-      // For non-default credentials, return the result of the connection test
       return await testConnection();
     } catch (error) {
       console.error("Failed to update AWS credentials:", error);
@@ -531,9 +495,9 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     progress,
     error,
     uploadUrl,
-    hasValidCredentials, 
+    hasValidCredentials,
     isUsingCustomCredentials,
-    isUsingRealStorage, 
+    isUsingRealStorage,
     toggleStorageMode,
     validateFile: (file: File) => validateFile(file),
     testConnection,
