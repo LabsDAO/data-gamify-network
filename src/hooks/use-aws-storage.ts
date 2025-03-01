@@ -97,31 +97,26 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     setError(null);
     setUploadUrl(null);
     
-    // Simulate initial progress for better UX
+    // Set initial progress
     setProgress(5);
     if (options.onProgress) {
       options.onProgress(5);
     }
     
     try {
-      // Simulate progress updates during the upload for better UX
+      // Use a progress interval to update the UI during upload
+      // Since AWS SDK v3 Upload doesn't provide progress events in browser
       const progressInterval = setInterval(() => {
         setProgress(prev => {
-          // Don't go above 90% until we get actual completion
-          const newProgress = Math.min(prev + Math.random() * 10, 90);
+          const newProgress = Math.min(prev + Math.random() * 5, 90);
           if (options.onProgress) {
             options.onProgress(newProgress);
           }
           return newProgress;
         });
-      }, 500);
+      }, 300);
       
-      // Enable real storage if the option is set
-      if (options.forceReal) {
-        setUseRealAwsStorage(true);
-      }
-
-      // Perform the actual upload
+      // Perform the actual AWS S3 upload
       const url = await uploadToAwsS3(file, options.path);
       
       // Clear the progress interval
@@ -141,7 +136,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       
       toast({
         title: "Upload successful",
-        description: `File uploaded to AWS S3 (simulated): ${file.name}`,
+        description: `File uploaded to AWS S3: ${file.name}`,
         variant: "success",
       });
       
@@ -154,12 +149,9 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
         options.onError(error);
       }
       
-      // Enhanced error toast with more information
-      const errorMessage = error.message || 'Upload failed. Please try again.';
-      
       toast({
         title: "Upload failed",
-        description: errorMessage,
+        description: error.message || 'Upload failed. Please try again.',
         variant: "destructive",
       });
       

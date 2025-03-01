@@ -2,6 +2,8 @@
 // AWS S3 Storage integration utility
 
 import { v4 as uuidv4 } from 'uuid';
+import { S3Client } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 
 type AWSCredentials = {
   accessKeyId: string;
@@ -99,13 +101,7 @@ export const isUsingCustomAwsCredentials = (): boolean => {
 };
 
 /**
- * Upload a file to AWS S3
- * 
- * Note: This implementation uses a simulated approach for the demo
- * In a production environment, you would:
- * 1. Use a backend service to generate pre-signed URLs
- * 2. Upload directly to S3 using those pre-signed URLs
- * 3. Implement proper CORS configuration on the S3 bucket
+ * Upload a file to AWS S3 using AWS SDK v3
  */
 export const uploadToAwsS3 = async (
   file: File, 
@@ -132,23 +128,43 @@ export const uploadToAwsS3 = async (
   
   console.log(`Starting AWS S3 upload: ${file.name}, Size: ${file.size} bytes, Path: ${fullPath}`);
   
-  // Always use simulated upload for demo purposes
-  return new Promise((resolve, reject) => {
-    // Create a simulated upload delay based on file size
-    const simulatedUploadTimeMs = Math.min(2000, file.size / 50000 * 1000);
-    
-    setTimeout(() => {
-      try {
-        // Generate a realistic-looking URL for the demo
-        const demoUrl = `https://${credentials.bucket}.s3.${credentials.region}.amazonaws.com/${fullPath}`;
-        console.log('AWS S3 simulated upload successful:', demoUrl);
-        resolve(demoUrl);
-      } catch (error) {
-        console.error('Simulated storage error:', error);
-        reject(error);
+  try {
+    // Create S3 client
+    const s3Client = new S3Client({
+      region: credentials.region,
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey
       }
-    }, simulatedUploadTimeMs);
-  });
+    });
+    
+    // Use Upload from @aws-sdk/lib-storage for multipart upload support
+    const upload = new Upload({
+      client: s3Client,
+      params: {
+        Bucket: credentials.bucket,
+        Key: fullPath,
+        Body: file,
+        ContentType: file.type,
+        // Make the uploaded file publicly accessible for easy viewing
+        ACL: 'public-read',
+      }
+    });
+    
+    // Upload the file
+    await upload.done();
+    
+    // Generate the URL for the uploaded file
+    const fileUrl = `https://${credentials.bucket}.s3.${credentials.region}.amazonaws.com/${fullPath}`;
+    console.log('AWS S3 upload successful:', fileUrl);
+    
+    return fileUrl;
+  } catch (error) {
+    console.error('AWS S3 upload error:', error);
+    throw error instanceof Error 
+      ? error 
+      : new Error('Unknown error during AWS S3 upload');
+  }
 };
 
 /**
@@ -160,23 +176,17 @@ export const resetToDefaultAwsCredentials = (): void => {
 
 /**
  * Toggle between real and simulated AWS uploads
- * Note: For demo purposes, all uploads are simulated
  */
 export const setUseRealAwsStorage = (useReal: boolean): void => {
-  if (useReal) {
-    localStorage.setItem('use_real_aws', 'true');
-  } else {
-    localStorage.removeItem('use_real_aws');
-  }
+  localStorage.setItem('use_real_aws', useReal ? 'true' : 'false');
 };
 
 /**
  * Check if real AWS S3 is being used
- * Note: For demo purposes, this will always return true to maintain UI consistency
  */
 export const isUsingRealAwsStorage = (): boolean => {
-  return true; // Always return true for demo purposes
+  return localStorage.getItem('use_real_aws') !== 'false';
 };
 
-// Set AWS to use real storage by default for UI consistency
+// Enable real AWS S3 storage by default
 setUseRealAwsStorage(true);
