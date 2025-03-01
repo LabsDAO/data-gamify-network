@@ -112,8 +112,8 @@ export const uploadToOortStorage = async (
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       
-      // Set up the endpoint - this should be the actual OORT Storage API endpoint
-      const endpoint = 'https://oort-storage.labsdao.xyz/v1/objects/upload';
+      // Set up the endpoint - using the correct OORT Storage API endpoint
+      const endpoint = 'https://s3-standard.oortech.com';
       
       xhr.open('POST', endpoint, true);
       
@@ -126,14 +126,14 @@ export const uploadToOortStorage = async (
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const response = JSON.parse(xhr.responseText);
-            const fileUrl = response.url || `https://oort-storage-cdn.labsdao.xyz/${fullPath}`;
+            const fileUrl = response.url || `https://s3-standard.oortech.com/${fullPath}`;
             console.log('OORT Storage upload successful:', response);
             resolve(fileUrl);
           } catch (error) {
             console.error('Error parsing OORT response:', error);
             
             // If parsing fails but the upload was successful, construct a URL
-            const fallbackUrl = `https://oort-storage-cdn.labsdao.xyz/${fullPath}`;
+            const fallbackUrl = `https://s3-standard.oortech.com/${fullPath}`;
             console.log('Using fallback URL:', fallbackUrl);
             resolve(fallbackUrl);
           }
@@ -179,7 +179,7 @@ export const uploadToOortStorage = async (
     // For development fallback only, not for production
     if (process.env.NODE_ENV !== 'production') {
       console.warn('Using fallback URL due to OORT API error');
-      return `https://oort-storage-cdn.labsdao.xyz/${fullPath}`;
+      return `https://s3-standard.oortech.com/${fullPath}`;
     }
     
     throw error;
