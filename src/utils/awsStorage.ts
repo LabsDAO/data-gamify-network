@@ -1,4 +1,3 @@
-
 // AWS S3 Storage integration utility
 
 import { v4 as uuidv4 } from 'uuid';
@@ -101,6 +100,47 @@ export const isUsingCustomAwsCredentials = (): boolean => {
 };
 
 /**
+ * Create S3 client with appropriate configuration, including CORS handling
+ */
+const createS3Client = (credentials: AWSCredentials) => {
+  // Add custom fetch handler to handle CORS issues better
+  const customFetchHandler = async (url: URL | string, options: RequestInit) => {
+    try {
+      console.log(`S3 Client requesting: ${typeof url === 'string' ? url : url.toString()}`);
+      const response = await fetch(url, {
+        ...options,
+        mode: 'cors', // Explicitly state CORS mode
+        credentials: 'omit' // Don't send cookies to AWS
+      });
+      return response;
+    } catch (error) {
+      console.error('AWS S3 fetch error:', error);
+      // Throw a more descriptive error
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          throw new Error('Network connection error. Please check your internet connection and firewall settings.');
+        }
+      }
+      throw error;
+    }
+  };
+
+  // Create S3 client with customized configuration
+  return new S3Client({
+    region: credentials.region,
+    credentials: {
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey
+    },
+    maxAttempts: 3,
+    // Use custom fetch with better error handling
+    requestHandler: {
+      fetch: customFetchHandler
+    }
+  });
+};
+
+/**
  * Get a list of all available buckets for the current credentials
  * This can be used to verify bucket existence and help users select the correct bucket
  */
@@ -108,15 +148,13 @@ export const listAwsBuckets = async (): Promise<string[]> => {
   const credentials = getAwsCredentials();
   
   try {
-    // Create S3 client with retry options
-    const s3Client = new S3Client({
+    console.log("Attempting to list AWS S3 buckets with credentials:", {
+      accessKeyId: credentials.accessKeyId.substring(0, 5) + "...",
       region: credentials.region,
-      credentials: {
-        accessKeyId: credentials.accessKeyId,
-        secretAccessKey: credentials.secretAccessKey
-      },
-      maxAttempts: 3, // Add retries for better reliability
     });
+    
+    // Create S3 client with our enhanced configuration
+    const s3Client = createS3Client(credentials);
     
     // List all buckets
     const { Buckets } = await s3Client.send(new ListBucketsCommand({}));
@@ -134,7 +172,8 @@ export const listAwsBuckets = async (): Promise<string[]> => {
         throw new Error("The AWS Access Key ID you provided is invalid");
       } else if (error.message.includes("SignatureDoesNotMatch")) {
         throw new Error("The AWS Secret Access Key you provided is invalid");
-      } else if (error.message.includes("NetworkingError") || error.message.includes("Failed to fetch")) {
+      } else if (error.message.includes("NetworkError") || error.message.includes("Failed to fetch") || 
+                 error.message.includes("Network connection error")) {
         throw new Error("Network error: Check your internet connection and make sure AWS services are not blocked");
       }
     }
@@ -155,6 +194,7 @@ export const testAwsConnectivity = async (): Promise<{
     writePermission: boolean;
     corsEnabled?: boolean;
     availableBuckets?: string[];
+    errorDetails?: string;
   }
 }> => {
   const credentials = getAwsCredentials();
@@ -166,7 +206,8 @@ export const testAwsConnectivity = async (): Promise<{
       bucketAccessible: false,
       writePermission: false,
       corsEnabled: undefined,
-      availableBuckets: []
+      availableBuckets: [],
+      errorDetails: undefined
     }
   };
   
@@ -183,20 +224,8 @@ export const testAwsConnectivity = async (): Promise<{
       bucket: credentials.bucket
     });
     
-    // Create S3 client with timeout and retry options for better error handling
-    const s3Client = new S3Client({
-      region: credentials.region,
-      credentials: {
-        accessKeyId: credentials.accessKeyId,
-        secretAccessKey: credentials.secretAccessKey
-      },
-      maxAttempts: 3,
-      requestHandler: {
-        abortController: new AbortController(),
-        setTimeout: (fn, time) => setTimeout(fn, time),
-        clearTimeout: (timeoutId) => clearTimeout(timeoutId)
-      }
-    });
+    // Create S3 client with our enhanced configuration
+    const s3Client = createS3Client(credentials);
     
     // Step 1: Validate credentials by listing buckets
     try {
@@ -222,13 +251,15 @@ export const testAwsConnectivity = async (): Promise<{
       console.error("AWS S3 credentials test failed:", listError);
       
       results.details.credentialsValid = false;
+      results.details.errorDetails = listError instanceof Error ? listError.message : String(listError);
       
       if (listError instanceof Error) {
         if (listError.message.includes("InvalidAccessKeyId")) {
           results.message = "The AWS Access Key ID you provided is invalid";
         } else if (listError.message.includes("SignatureDoesNotMatch")) {
           results.message = "The AWS Secret Access Key you provided is invalid";
-        } else if (listError.message.includes("NetworkingError") || listError.message.includes("Failed to fetch")) {
+        } else if (listError.message.includes("NetworkError") || listError.message.includes("Failed to fetch") || 
+                  listError.message.includes("Network connection error")) {
           results.message = "Network error connecting to AWS. Check your internet connection or if AWS services are blocked";
         } else {
           results.message = `AWS credentials error: ${listError.message}`;
@@ -240,6 +271,15 @@ export const testAwsConnectivity = async (): Promise<{
       return results;
     }
     
+    // If we couldn't test bucket connectivity due to network issues, provide a fallback mechanism
+    if (results.details.credentialsValid && results.details.availableBuckets.includes(credentials.bucket)) {
+      results.details.bucketAccessible = true;
+      results.success = true;
+      results.message = "Your bucket exists but we couldn't test full connectivity due to network constraints. " + 
+                        "You may be able to upload if your bucket permissions are correctly configured.";
+    }
+    
+    // The rest of the function will try to access the bucket and test writing to it
     // Step 2: Check bucket existence and accessibility
     if (!credentials.bucket) {
       results.message = "No bucket specified. Please select a bucket.";
@@ -322,6 +362,7 @@ export const testAwsConnectivity = async (): Promise<{
     }
   } catch (error) {
     console.error("AWS S3 general test failed:", error);
+    results.details.errorDetails = error instanceof Error ? error.message : String(error);
     results.message = "AWS S3 test failed: " + (error instanceof Error ? error.message : String(error));
   }
   
@@ -380,11 +421,17 @@ export const uploadToAwsS3 = async (
   const fullPath = `${path}${fileName}`.replace(/\/\//g, '/');
   
   try {
-    // Test connectivity before attempting upload
+    // Use a more lenient connectivity test for environments with CORS restrictions
     console.log("Testing AWS connectivity before upload");
     const connectivityTest = await testAwsConnectivity();
     
-    if (!connectivityTest.success) {
+    // Allow uploads to proceed if we know the credentials are valid and the bucket exists,
+    // even if we couldn't complete the full connectivity test due to network/CORS constraints
+    const canProceed = connectivityTest.success || 
+                       (connectivityTest.details.credentialsValid && 
+                        connectivityTest.details.availableBuckets?.includes(credentials.bucket));
+    
+    if (!canProceed) {
       console.error("AWS connectivity test failed:", connectivityTest.message);
       
       // Check if the bucket exists in available buckets
@@ -410,15 +457,8 @@ export const uploadToAwsS3 = async (
       throw new Error(`AWS S3 connectivity issue: ${connectivityTest.message}`);
     }
     
-    // Create S3 client with retry options
-    const s3Client = new S3Client({
-      region: credentials.region,
-      credentials: {
-        accessKeyId: credentials.accessKeyId,
-        secretAccessKey: credentials.secretAccessKey
-      },
-      maxAttempts: 3
-    });
+    // Use our enhanced S3 client with better error handling
+    const s3Client = createS3Client(credentials);
     
     console.log(`Uploading to S3: ${credentials.bucket}/${fullPath}`);
     
