@@ -269,7 +269,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     }
   };
 
-  // Upload file function with improved error handling and Lovable environment optimization
+  // Upload file function with improved error handling
   const uploadFile = async (file: File) => {
     if (!file) {
       const noFileError = new Error('No file selected');
@@ -371,7 +371,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       }, 300);
       
       // Perform the actual AWS S3 upload
-      console.log(`Starting upload of ${file.name} to AWS S3`);
+      console.log(`Starting upload of ${file.name} to AWS S3 with path: ${options.path || 'uploads/'}`);
       const url = await uploadToAwsS3(file, options.path);
       
       // Clear the progress interval
@@ -402,38 +402,6 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       
       if (options.onError) {
         options.onError(error);
-      }
-      
-      // Special handling for network errors in Lovable environment with default credentials
-      if (credentials.accessKeyId === "AKIAXZ5NGJRVYNNHVYFG" && 
-          credentials.bucket === "labsmarket" &&
-          error.message.includes("Failed to fetch")) {
-        
-        console.log("Network error in Lovable environment - simulating successful upload");
-        
-        // Generate a simulated upload URL
-        const timestamp = Date.now();
-        const simulatedPath = `${options.path || 'uploads/'}${timestamp}-simulated-${file.name}`;
-        const simulatedUrl = `https://${credentials.bucket}.s3.amazonaws.com/${simulatedPath}`;
-        
-        setProgress(100);
-        if (options.onProgress) {
-          options.onProgress(100);
-        }
-        
-        setUploadUrl(simulatedUrl);
-        
-        if (options.onSuccess) {
-          options.onSuccess(simulatedUrl);
-        }
-        
-        toast({
-          title: "Upload successful (simulated)",
-          description: `File uploaded to AWS S3 (simulated in Lovable environment): ${file.name}`,
-          variant: "success",
-        });
-        
-        return simulatedUrl;
       }
       
       toast({

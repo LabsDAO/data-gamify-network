@@ -301,147 +301,92 @@ export const uploadToAwsS3 = async (
   const fileName = `${timestamp}-${uuid}-${file.name}`;
   const fullPath = `${normalizedPath}${fileName}`.replace(/\/\//g, '/');
   
+  console.log(`AWS S3 Upload - Full key path: ${fullPath}`);
+  
   return new Promise((resolve, reject) => {
     try {
-      console.log("Using XMLHttpRequest approach for S3 upload - more compatible with Lovable environment");
+      console.log("Using direct PUT request approach for S3 upload");
       
-      // Generate pre-signed URL for direct upload
-      // Since we can't generate pre-signed URLs in the client, we'll use a direct PUT
-      // This works with proper CORS configuration on the S3 bucket
+      // Generate endpoint URL for direct upload
       const s3Endpoint = getBucketEndpointUrl(credentials.bucket, credentials.region);
       const uploadUrl = `${s3Endpoint}/${fullPath}`;
       
-      console.log(`Uploading via XMLHttpRequest to: ${uploadUrl}`);
+      console.log(`Uploading file directly to: ${uploadUrl}`);
       
-      // Create an XHR request for the upload
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', uploadUrl, true);
+      // Using the PutObjectCommand from AWS SDK directly - this is more reliable in Lovable
+      const s3Client = createS3Client(credentials);
       
-      // Set proper content type
-      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      console.log(`Using AWS SDK PutObjectCommand to upload to: ${credentials.bucket}/${fullPath}`);
       
-      // Generate AWS signature headers
-      // In a real implementation, this would include AWS Signature v4 headers
-      // For Lovable environment with DEFAULT_CREDENTIALS, we'll use a simplified approach
-      if (credentials.accessKeyId === DEFAULT_CREDENTIALS.accessKeyId && 
-          credentials.secretAccessKey === DEFAULT_CREDENTIALS.secretAccessKey &&
-          credentials.bucket === DEFAULT_CREDENTIALS.bucket) {
+      // Create the PUT object command
+      const putCommand = new PutObjectCommand({
+        Bucket: credentials.bucket,
+        Key: fullPath,
+        Body: file,
+        ContentType: file.type || 'application/octet-stream',
+        ACL: 'public-read'
+      });
+      
+      // Execute the command
+      s3Client.send(putCommand)
+        .then(() => {
+          const fileUrl = `${s3Endpoint}/${fullPath}`;
+          console.log('AWS S3 upload successful:', fileUrl);
+          resolve(fileUrl);
+        })
+        .catch((error) => {
+          console.error('AWS S3 upload error:', error);
           
-        // Add a custom header that won't interfere with CORS but helps identify the request
-        xhr.setRequestHeader('X-Custom-Auth', 'Lovable-AWS-Auth');
-        
-        // Set proper 'x-amz-acl' header for public-read permission
-        xhr.setRequestHeader('x-amz-acl', 'public-read');
-        
-        // Track upload progress
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = (event.loaded / event.total) * 100;
-            console.log(`Upload progress: ${percentComplete.toFixed(2)}%`);
-          }
-        };
-        
-        // Handle upload completion
-        xhr.onload = function() {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            const fileUrl = `${s3Endpoint}/${fullPath}`;
-            console.log('AWS S3 upload successful via XHR:', fileUrl);
-            resolve(fileUrl);
+          // If there's a specific error about the bucket or permissions, throw it
+          if (error.name === 'NoSuchBucket') {
+            reject(new Error(`Bucket "${credentials.bucket}" does not exist`));
+          } else if (error.name === 'AccessDenied') {
+            reject(new Error('Access denied. Check your credentials and bucket permissions'));
           } else {
-            const errorMessage = `AWS S3 upload failed: ${xhr.status} ${xhr.statusText}`;
-            console.error(errorMessage);
+            // For other errors, try a fallback approach with XMLHttpRequest
+            console.log('Attempting fallback upload method with XMLHttpRequest...');
             
-            // For Lovable environment with default credentials, simulate success
-            if (credentials.accessKeyId === DEFAULT_CREDENTIALS.accessKeyId && 
-                credentials.secretAccessKey === DEFAULT_CREDENTIALS.secretAccessKey &&
-                credentials.bucket === DEFAULT_CREDENTIALS.bucket) {
-                
-              console.log("Network restriction detected, but we know credentials are valid. Proceeding with upload.");
-              const fileUrl = `${s3Endpoint}/${fullPath}`;
-              console.log('Proceeding with upload as if successful:', fileUrl);
-              resolve(fileUrl);
-            } else {
-              reject(new Error(errorMessage));
-            }
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', uploadUrl, true);
+            
+            // Set content type and ACL header
+            xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+            xhr.setRequestHeader('x-amz-acl', 'public-read');
+            
+            // Track upload progress
+            xhr.upload.onprogress = (event) => {
+              if (event.lengthComputable) {
+                const percentComplete = (event.loaded / event.total) * 100;
+                console.log(`Upload progress: ${percentComplete.toFixed(2)}%`);
+              }
+            };
+            
+            // Handle upload completion
+            xhr.onload = function() {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                const fileUrl = `${s3Endpoint}/${fullPath}`;
+                console.log('AWS S3 upload successful via XHR:', fileUrl);
+                resolve(fileUrl);
+              } else {
+                const errorMessage = `AWS S3 upload failed: ${xhr.status} ${xhr.statusText}`;
+                console.error(errorMessage);
+                reject(new Error(errorMessage));
+              }
+            };
+            
+            // Handle network errors
+            xhr.onerror = function(e) {
+              console.error('Network error during AWS S3 upload via XHR:', e);
+              reject(new Error('Network error occurred during AWS S3 upload. This may be due to CORS restrictions.'));
+            };
+            
+            // Send the file
+            xhr.send(file);
           }
-        };
-        
-        // Handle network errors
-        xhr.onerror = function(e) {
-          console.error('Network error during AWS S3 upload via XHR:', e);
-          
-          // For Lovable environment, proceed anyway with default credentials
-          if (credentials.accessKeyId === DEFAULT_CREDENTIALS.accessKeyId && 
-              credentials.secretAccessKey === DEFAULT_CREDENTIALS.secretAccessKey &&
-              credentials.bucket === DEFAULT_CREDENTIALS.bucket) {
-              
-            console.log("Network restriction detected, but we know credentials are valid. Proceeding with upload.");
-            const fileUrl = `${s3Endpoint}/${fullPath}`;
-            console.log('Proceeding with upload as if successful:', fileUrl);
-            resolve(fileUrl);
-          } else {
-            reject(new Error('Network error occurred during AWS S3 upload. This may be due to CORS restrictions.'));
-          }
-        };
-        
-        // Send the file
-        xhr.send(file);
-      } else {
-        // For non-default credentials, use the AWS SDK's PutObjectCommand
-        // This is a fallback but may not work in the Lovable environment
-        const s3Client = createS3Client(credentials);
-        
-        console.log(`Falling back to AWS SDK for non-default credentials upload to: ${credentials.bucket}/${fullPath}`);
-        
-        // Using the simpler PutObjectCommand directly instead of the multipart Upload
-        const command = new PutObjectCommand({
-          Bucket: credentials.bucket,
-          Key: fullPath,
-          Body: file,
-          ContentType: file.type || 'application/octet-stream',
-          ACL: 'public-read'
         });
-        
-        // Execute the command
-        s3Client.send(command)
-          .then(() => {
-            const fileUrl = `${s3Endpoint}/${fullPath}`;
-            console.log('AWS S3 upload successful via SDK:', fileUrl);
-            resolve(fileUrl);
-          })
-          .catch((error) => {
-            console.error('AWS S3 upload error via SDK:', error);
-            
-            // Even for SDK errors with default credentials, proceed in Lovable
-            if (credentials.accessKeyId === DEFAULT_CREDENTIALS.accessKeyId && 
-                credentials.secretAccessKey === DEFAULT_CREDENTIALS.secretAccessKey &&
-                credentials.bucket === DEFAULT_CREDENTIALS.bucket) {
-                
-              console.log("SDK error with default credentials in Lovable environment. Proceeding with upload.");
-              const fileUrl = `${s3Endpoint}/${fullPath}`;
-              console.log('Proceeding with upload as if successful:', fileUrl);
-              resolve(fileUrl);
-            } else {
-              reject(error);
-            }
-          });
-      }
     } catch (error) {
       console.error('Unexpected error setting up AWS S3 upload:', error);
-      
-      // For default credentials in Lovable, proceed anyway
-      if (credentials.accessKeyId === DEFAULT_CREDENTIALS.accessKeyId && 
-          credentials.secretAccessKey === DEFAULT_CREDENTIALS.secretAccessKey &&
-          credentials.bucket === DEFAULT_CREDENTIALS.bucket) {
-          
-        console.log("Error with default credentials in Lovable environment. Proceeding with upload.");
-        const s3Endpoint = getBucketEndpointUrl(credentials.bucket, credentials.region);
-        const fileUrl = `${s3Endpoint}/${fullPath}`;
-        console.log('Proceeding with upload as if successful:', fileUrl);
-        resolve(fileUrl);
-      } else {
-        reject(error);
-      }
+      reject(error);
     }
   });
 };

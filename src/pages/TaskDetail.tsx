@@ -137,10 +137,11 @@ const TaskDetail = () => {
       setAwsCredentials(getAwsCredentials());
       
       if (!connectionStatus.tested) {
+        console.log(`Testing AWS connection with path: ${uploadPath}`);
         testConnection().catch(console.error);
       }
     }
-  }, [storageOption, connectionStatus.tested]);
+  }, [storageOption, connectionStatus.tested, uploadPath]);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -265,6 +266,7 @@ const TaskDetail = () => {
         let uploadedUrl;
         
         if (storageOption === "aws") {
+          console.log(`Starting AWS S3 upload for ${file.name} to path ${uploadPath}`);
           uploadedUrl = await uploadToAws(file);
         } else if (storageOption === "azure") {
           toast({
@@ -274,6 +276,7 @@ const TaskDetail = () => {
           });
           continue;
         } else {
+          console.log(`Starting OORT upload for ${file.name} to path ${uploadPath}`);
           uploadedUrl = await uploadToOort(file);
         }
         
