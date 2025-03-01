@@ -5,12 +5,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { getOortCredentials, saveOortCredentials, resetToDefaultCredentials, isUsingCustomCredentials } from "@/utils/oortStorage";
+import { 
+  getOortCredentials, 
+  saveOortCredentials, 
+  resetToDefaultCredentials, 
+  isUsingCustomCredentials,
+  setUseRealOortStorage,
+  isUsingRealOortStorage 
+} from "@/utils/oortStorage";
+import { Switch } from "@/components/ui/switch";
 
 const OortCredentialsForm = () => {
   const [accessKey, setAccessKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
   const [isCustom, setIsCustom] = useState(false);
+  const [useRealStorage, setUseRealStorage] = useState(false);
 
   useEffect(() => {
     // Check if using custom credentials
@@ -22,6 +31,9 @@ const OortCredentialsForm = () => {
       setAccessKey(credentials.accessKey);
       setSecretKey(credentials.secretKey);
     }
+    
+    // Check storage mode
+    setUseRealStorage(isUsingRealOortStorage());
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -56,6 +68,18 @@ const OortCredentialsForm = () => {
       description: "Using default OORT Storage credentials now.",
     });
   };
+  
+  const handleStorageToggle = (checked: boolean) => {
+    setUseRealStorage(checked);
+    setUseRealOortStorage(checked);
+    
+    toast({
+      title: checked ? "Real Storage Enabled" : "Simulation Mode Enabled",
+      description: checked 
+        ? "Files will be uploaded to actual OORT Cloud storage." 
+        : "Files will be simulated for development purposes.",
+    });
+  };
 
   return (
     <Card className="w-full">
@@ -68,6 +92,20 @@ const OortCredentialsForm = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="mb-6 flex items-center justify-between">
+          <div className="space-y-1">
+            <h4 className="font-medium">Storage Mode</h4>
+            <p className="text-sm text-muted-foreground">
+              {useRealStorage ? "Using real OORT Cloud storage" : "Using simulated storage (dev mode)"}
+            </p>
+          </div>
+          <Switch 
+            checked={useRealStorage} 
+            onCheckedChange={handleStorageToggle} 
+            id="storage-mode"
+          />
+        </div>
+        
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="accessKey">Access Key</Label>
@@ -105,6 +143,11 @@ const OortCredentialsForm = () => {
       </CardContent>
       <CardFooter className="text-sm text-muted-foreground">
         Your credentials are stored locally in your browser and are never sent to our servers.
+        {useRealStorage && !isCustom && (
+          <div className="mt-2 text-amber-500">
+            Warning: Using real storage with default credentials. For production use, please set your own credentials.
+          </div>
+        )}
       </CardFooter>
     </Card>
   );

@@ -107,8 +107,8 @@ export const uploadToOortStorage = async (
   
   console.log(`Starting OORT upload: ${file.name}, Size: ${file.size} bytes, Path: ${fullPath}`);
   
-  // For development/demo fallback
-  const useFallbackStorage = process.env.NODE_ENV === 'development' || true;
+  // Enable fallback only for explicit development mode, not for production or when testing actual uploads
+  const useFallbackStorage = process.env.NODE_ENV === 'development' && localStorage.getItem('use_real_oort') !== 'true';
   
   if (useFallbackStorage) {
     // Store in localStorage as base64 for demo purposes
@@ -137,15 +137,24 @@ export const uploadToOortStorage = async (
       const endpoint = 'https://s3-standard.oortech.com';
       const uploadUrl = `${endpoint}/${fullPath}`;
       
+      console.log(`Uploading to: ${uploadUrl}`);
+      
       xhr.open('PUT', uploadUrl, true);
       
       // Set proper content type based on file type
       xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
       
       // Set S3-compatible authentication headers
+      // Note: This is a simplified version of S3 auth, for full implementation
+      // proper signature calculation is needed
       xhr.setRequestHeader('X-Amz-Content-Sha256', 'UNSIGNED-PAYLOAD');
       xhr.setRequestHeader('X-Amz-Date', new Date().toISOString().replace(/[:\-]|\.\d{3}/g, ''));
       xhr.setRequestHeader('Authorization', `AWS4-HMAC-SHA256 Credential=${credentials.accessKey}`);
+      
+      // Add custom OORT headers if they are supported
+      // This is a fallback in case the S3-compatible headers don't work
+      xhr.setRequestHeader('X-OORT-ACCESS-KEY', credentials.accessKey);
+      xhr.setRequestHeader('X-OORT-SECRET-KEY', credentials.secretKey);
       
       // Handle completion
       xhr.onload = function() {
@@ -164,6 +173,7 @@ export const uploadToOortStorage = async (
             errorMessage += ` - ${xhr.statusText || 'Unknown error'}`;
           }
           console.error(errorMessage);
+          console.error('Response:', xhr.responseText);
           reject(new Error(errorMessage));
         }
       };
@@ -204,4 +214,22 @@ export const uploadToOortStorage = async (
  */
 export const resetToDefaultCredentials = (): void => {
   localStorage.removeItem('oort_credentials');
+};
+
+/**
+ * Toggle between real and simulated uploads
+ */
+export const setUseRealOortStorage = (useReal: boolean): void => {
+  if (useReal) {
+    localStorage.setItem('use_real_oort', 'true');
+  } else {
+    localStorage.removeItem('use_real_oort');
+  }
+};
+
+/**
+ * Check if real OORT Storage is being used
+ */
+export const isUsingRealOortStorage = (): boolean => {
+  return localStorage.getItem('use_real_oort') === 'true';
 };

@@ -1,7 +1,13 @@
 
 import { useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
-import { uploadToOortStorage, validateFile, getOortCredentials } from '@/utils/oortStorage';
+import { 
+  uploadToOortStorage, 
+  validateFile, 
+  getOortCredentials,
+  setUseRealOortStorage,
+  isUsingRealOortStorage 
+} from '@/utils/oortStorage';
 
 interface UseOortStorageOptions {
   onSuccess?: (url: string) => void;
@@ -130,6 +136,23 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
   // Get credential status
   const credentials = getOortCredentials();
   const isUsingDefaultCredentials = credentials.accessKey === "1YAWCOB9IEL5O5K13F5P";
+  
+  // Get storage mode (real or simulated)
+  const isUsingRealStorage = isUsingRealOortStorage();
+  
+  // Toggle between real and simulated storage
+  const toggleStorageMode = () => {
+    const newMode = !isUsingRealStorage;
+    setUseRealOortStorage(newMode);
+    
+    toast({
+      title: newMode ? "Using Real OORT Storage" : "Using Simulated Storage",
+      description: newMode 
+        ? "Files will be uploaded to actual OORT Cloud storage." 
+        : "Files will be simulated for development purposes.",
+      variant: "default",
+    });
+  };
 
   return {
     uploadFile,
@@ -138,6 +161,8 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
     error,
     uploadUrl,
     isUsingDefaultCredentials,
+    isUsingRealStorage,
+    toggleStorageMode,
     validateFile: (file: File) => validateFile(file), // Expose validation function
   };
 }
