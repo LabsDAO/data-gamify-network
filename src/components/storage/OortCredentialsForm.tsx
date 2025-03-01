@@ -5,19 +5,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { 
-  getOortCredentials, 
-  saveOortCredentials, 
-  resetToDefaultCredentials, 
+import {
+  getOortCredentials,
+  saveOortCredentials,
+  resetToDefaultCredentials,
   isUsingCustomCredentials,
   setUseRealOortStorage,
-  isUsingRealOortStorage 
+  isUsingRealOortStorage
 } from "@/utils/oortStorage";
 import { Switch } from "@/components/ui/switch";
 
 const OortCredentialsForm = () => {
   const [accessKey, setAccessKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
+  const [endpoint, setEndpoint] = useState('https://s3-standard.oortech.com');
   const [isCustom, setIsCustom] = useState(false);
   const [useRealStorage, setUseRealStorage] = useState(false);
 
@@ -37,6 +38,12 @@ const OortCredentialsForm = () => {
       setSecretKey(defaultCreds.secretKey);
     }
     
+    // Get endpoint from environment variable or use default
+    const envEndpoint = import.meta.env.VITE_OORT_ENDPOINT;
+    if (envEndpoint) {
+      setEndpoint(envEndpoint);
+    }
+    
     // Check storage mode
     setUseRealStorage(isUsingRealOortStorage());
   }, []);
@@ -53,7 +60,16 @@ const OortCredentialsForm = () => {
       return;
     }
     
-    saveOortCredentials({ accessKey, secretKey });
+    if (!endpoint) {
+      toast({
+        title: "Validation Error",
+        description: "OORT endpoint URL is required.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    saveOortCredentials({ accessKey, secretKey, endpoint });
     setIsCustom(true);
     
     toast({
@@ -67,6 +83,7 @@ const OortCredentialsForm = () => {
     const defaultCreds = getOortCredentials();
     setAccessKey(defaultCreds.accessKey);
     setSecretKey(defaultCreds.secretKey);
+    setEndpoint(defaultCreds.endpoint || 'https://s3-standard.oortech.com');
     setIsCustom(false);
     
     toast({
@@ -133,6 +150,20 @@ const OortCredentialsForm = () => {
               placeholder="Enter your OORT Storage secret key"
               type="password"
             />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="endpoint">OORT Endpoint</Label>
+            <Input
+              id="endpoint"
+              value={endpoint}
+              onChange={(e) => setEndpoint(e.target.value)}
+              placeholder="Enter your OORT Storage endpoint URL"
+              type="text"
+            />
+            <p className="text-xs text-muted-foreground">
+              Standard endpoint: https://s3-standard.oortech.com
+            </p>
           </div>
           
           <div className="flex justify-end space-x-2">

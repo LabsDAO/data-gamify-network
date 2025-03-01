@@ -55,20 +55,49 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (authenticated && privyUser) {
       // If authenticated with Privy but no local user, create one
       if (!storedUser) {
+        // Get wallet address from Privy user
+        let walletAddress = '';
+        
+        // Check for linked wallets
+        if (privyUser.linkedAccounts && privyUser.linkedAccounts.length > 0) {
+          // Find the first wallet account
+          const walletAccount = privyUser.linkedAccounts.find(
+            account => account.type === 'wallet'
+          );
+          
+          if (walletAccount && walletAccount.address) {
+            walletAddress = walletAccount.address;
+            console.log("Found wallet address from linked accounts:", walletAddress);
+          }
+        }
+        
+        // Fallback to the wallet property if no linked wallet found
+        if (!walletAddress && privyUser.wallet && privyUser.wallet.address) {
+          walletAddress = privyUser.wallet.address;
+          console.log("Found wallet address from wallet property:", walletAddress);
+        }
+        
         const newUser: User = {
           id: privyUser.id || `user_${Date.now()}`,
-          username: privyUser.email?.address || `user_${Date.now().toString().slice(-4)}`,
+          username: privyUser.email?.address ||
+                   (walletAddress ? `${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}` :
+                   `user_${Date.now().toString().slice(-4)}`),
           trustLevel: 'Newcomer',
           points: 0,
           isOrganization: false,
-          walletAddress: privyUser.wallet?.address,
+          walletAddress: walletAddress,
         };
         
         setUser(newUser);
         localStorage.setItem('labsmarket_user', JSON.stringify(newUser));
+        
+        const welcomeMessage = walletAddress
+          ? `Welcome, wallet user ${newUser.username}!`
+          : `Welcome, ${newUser.username}!`;
+          
         toast({
           title: "Successfully signed in",
-          description: `Welcome, ${newUser.username}!`,
+          description: welcomeMessage,
         });
       } else {
         setUser(JSON.parse(storedUser));

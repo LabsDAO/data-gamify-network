@@ -9,4 +9,5 @@ export interface UseOortStorageOptions {
   onProgress?: (progress: number) => void;
   path?: string;
   forceReal?: boolean;
+  trackUploads?: boolean; // Whether to track uploads in Supabase
 }
