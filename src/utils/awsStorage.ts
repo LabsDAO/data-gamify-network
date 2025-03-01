@@ -108,21 +108,37 @@ export const listAwsBuckets = async (): Promise<string[]> => {
   const credentials = getAwsCredentials();
   
   try {
-    // Create S3 client
+    // Create S3 client with retry options
     const s3Client = new S3Client({
       region: credentials.region,
       credentials: {
         accessKeyId: credentials.accessKeyId,
         secretAccessKey: credentials.secretAccessKey
-      }
+      },
+      maxAttempts: 3, // Add retries for better reliability
     });
     
     // List all buckets
     const { Buckets } = await s3Client.send(new ListBucketsCommand({}));
     
+    // If we get here, credentials are valid
+    console.log("AWS credentials validated successfully, buckets:", Buckets?.map(b => b.Name));
+    
     return (Buckets || []).map(bucket => bucket.Name || '').filter(Boolean);
   } catch (error) {
     console.error("Failed to list AWS S3 buckets:", error);
+    
+    // More specific error handling
+    if (error instanceof Error) {
+      if (error.message.includes("InvalidAccessKeyId")) {
+        throw new Error("The AWS Access Key ID you provided is invalid");
+      } else if (error.message.includes("SignatureDoesNotMatch")) {
+        throw new Error("The AWS Secret Access Key you provided is invalid");
+      } else if (error.message.includes("NetworkingError") || error.message.includes("Failed to fetch")) {
+        throw new Error("Network error: Check your internet connection and make sure AWS services are not blocked");
+      }
+    }
+    
     throw new Error(`Failed to list AWS S3 buckets: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
@@ -161,92 +177,152 @@ export const testAwsConnectivity = async (): Promise<{
       return results;
     }
     
-    results.details.credentialsValid = true;
+    console.log("Testing AWS connectivity with credentials:", {
+      accessKeyId: credentials.accessKeyId.substring(0, 5) + "...",
+      region: credentials.region,
+      bucket: credentials.bucket
+    });
     
-    // Create S3 client
+    // Create S3 client with timeout and retry options for better error handling
     const s3Client = new S3Client({
       region: credentials.region,
       credentials: {
         accessKeyId: credentials.accessKeyId,
         secretAccessKey: credentials.secretAccessKey
+      },
+      maxAttempts: 3,
+      requestHandler: {
+        abortController: new AbortController(),
+        setTimeout: (fn, time) => setTimeout(fn, time),
+        clearTimeout: (timeoutId) => clearTimeout(timeoutId)
       }
     });
     
+    // Step 1: Validate credentials by listing buckets
     try {
-      // Get list of available buckets to help user verify bucket name
-      try {
-        const { Buckets } = await s3Client.send(new ListBucketsCommand({}));
-        results.details.availableBuckets = (Buckets || []).map(bucket => bucket.Name || '').filter(Boolean);
-        
-        // Check if the specified bucket is in the list of available buckets
-        const bucketExists = results.details.availableBuckets.includes(credentials.bucket);
-        if (!bucketExists) {
-          results.message = `Bucket "${credentials.bucket}" not found. Available buckets: ${results.details.availableBuckets.join(', ')}`;
-        }
-      } catch (listError) {
-        console.error("Failed to list buckets:", listError);
-        // Not critical, continue with other tests
-      }
+      const { Buckets } = await s3Client.send(new ListBucketsCommand({}));
+      results.details.credentialsValid = true;
+      results.details.availableBuckets = (Buckets || []).map(bucket => bucket.Name || '').filter(Boolean);
       
-      try {
-        // Check if bucket exists and is accessible
-        await s3Client.send(new HeadBucketCommand({ Bucket: credentials.bucket }));
-        results.details.bucketAccessible = true;
-      } catch (headError: any) {
-        console.error("AWS S3 bucket access test failed:", headError);
-        
-        if (headError.name === 'NoSuchBucket') {
-          results.message = `Bucket "${credentials.bucket}" does not exist. Please check your bucket name.`;
-        } else if (headError.name === 'AccessDenied') {
-          results.message = `Access denied to bucket "${credentials.bucket}". Check IAM permissions.`;
-        } else {
-          results.message = `Failed to access bucket "${credentials.bucket}": ${headError.message}`;
-        }
-        
+      console.log("AWS S3 credentials valid, available buckets:", results.details.availableBuckets);
+      
+      // If no bucket is specified, suggest one
+      if (!credentials.bucket && results.details.availableBuckets.length > 0) {
+        results.message = `No bucket specified. Available buckets: ${results.details.availableBuckets.join(", ")}`;
         return results;
       }
       
-      // Second test - try to upload a tiny test file
+      // Check if specified bucket exists
+      const bucketExists = credentials.bucket && results.details.availableBuckets.includes(credentials.bucket);
+      if (!bucketExists && credentials.bucket) {
+        results.message = `Bucket "${credentials.bucket}" not found. Available buckets: ${results.details.availableBuckets.join(", ")}`;
+        // Don't return here, try to access the bucket anyway in case it's a permissions issue
+      }
+    } catch (listError) {
+      console.error("AWS S3 credentials test failed:", listError);
+      
+      results.details.credentialsValid = false;
+      
+      if (listError instanceof Error) {
+        if (listError.message.includes("InvalidAccessKeyId")) {
+          results.message = "The AWS Access Key ID you provided is invalid";
+        } else if (listError.message.includes("SignatureDoesNotMatch")) {
+          results.message = "The AWS Secret Access Key you provided is invalid";
+        } else if (listError.message.includes("NetworkingError") || listError.message.includes("Failed to fetch")) {
+          results.message = "Network error connecting to AWS. Check your internet connection or if AWS services are blocked";
+        } else {
+          results.message = `AWS credentials error: ${listError.message}`;
+        }
+      } else {
+        results.message = "AWS credentials test failed with unknown error";
+      }
+      
+      return results;
+    }
+    
+    // Step 2: Check bucket existence and accessibility
+    if (!credentials.bucket) {
+      results.message = "No bucket specified. Please select a bucket.";
+      return results;
+    }
+    
+    try {
+      // Try to access bucket
+      console.log(`Testing access to bucket: ${credentials.bucket}`);
+      
+      await s3Client.send(new HeadBucketCommand({
+        Bucket: credentials.bucket
+      }));
+      
+      results.details.bucketAccessible = true;
+      console.log(`Bucket ${credentials.bucket} is accessible`);
+    } catch (bucketError: any) {
+      console.error("AWS S3 bucket access test failed:", bucketError);
+      
+      // Extract more specific error information
+      if (bucketError.name === 'NoSuchBucket') {
+        results.message = `Bucket "${credentials.bucket}" does not exist. Please check your bucket name.`;
+      } else if (bucketError.name === 'AccessDenied' || bucketError.message?.includes('Access Denied')) {
+        results.message = `Access denied to bucket "${credentials.bucket}". Check IAM permissions.`;
+      } else if (bucketError.message?.includes('NetworkingError') || bucketError.message?.includes('Failed to fetch')) {
+        results.message = "Network error connecting to S3 bucket. Check your internet connection.";
+      } else {
+        results.message = `Failed to access bucket "${credentials.bucket}": ${bucketError.message || 'Unknown error'}`;
+      }
+      
+      // If the error was permissions, try to test write permissions anyway
+      if (!bucketError.message?.includes('NoSuchBucket')) {
+        // Continue to test write permissions
+      } else {
+        return results;
+      }
+    }
+    
+    // Step 3: Test write permissions
+    try {
+      console.log(`Testing write permissions to bucket: ${credentials.bucket}`);
+      
+      // Create a tiny test file
       const testBytes = new TextEncoder().encode("AWS S3 Test");
       const testBlob = new Blob([testBytes], { type: 'text/plain' });
       const testFile = new File([testBlob], "aws-connectivity-test.txt", { type: 'text/plain' });
       
       const testPath = `tests/aws-connectivity-test-${Date.now()}.txt`;
       
-      try {
-        // Try direct PutObject first (simpler than multipart)
-        await s3Client.send(new PutObjectCommand({
-          Bucket: credentials.bucket,
-          Key: testPath,
-          Body: testFile,
-          ContentType: testFile.type
-        }));
-        
-        results.details.writePermission = true;
-        results.details.corsEnabled = true; // If this succeeds, CORS is likely configured properly
-        
-        results.success = true;
-        results.message = "AWS S3 connection successful! All tests passed.";
-      } catch (putError: any) {
-        console.error("AWS S3 write permission test failed:", putError);
-        
-        if (putError.toString().includes("CORS")) {
-          results.details.corsEnabled = false;
-          results.message = "AWS S3 CORS configuration issue detected. You need to enable CORS on your S3 bucket.";
-        } else if (putError.name === 'AccessDenied') {
-          results.message = "AWS S3 write permission denied. Check your IAM permissions, make sure you have s3:PutObject permission.";
-        } else {
-          results.details.corsEnabled = undefined; // Unknown
-          results.message = `AWS S3 write permission test failed: ${putError.message}`;
-        }
+      // Try direct PutObject for write permission test
+      await s3Client.send(new PutObjectCommand({
+        Bucket: credentials.bucket,
+        Key: testPath,
+        Body: testFile,
+        ContentType: testFile.type,
+        ACL: 'public-read'
+      }));
+      
+      results.details.writePermission = true;
+      results.details.corsEnabled = true; // If this succeeds, CORS is likely configured properly
+      
+      results.success = true;
+      results.message = "AWS S3 connection successful! All tests passed.";
+      
+      console.log("AWS S3 write permission test passed");
+    } catch (writeError: any) {
+      console.error("AWS S3 write permission test failed:", writeError);
+      
+      if (writeError.toString().includes("CORS")) {
+        results.details.corsEnabled = false;
+        results.message = "AWS S3 CORS configuration issue detected. You need to enable CORS on your S3 bucket.";
+      } else if (writeError.name === 'AccessDenied' || writeError.message?.includes('Access Denied')) {
+        results.message = "AWS S3 write permission denied. Check your IAM permissions, make sure you have s3:PutObject permission.";
+      } else if (writeError.message?.includes('NetworkingError') || writeError.message?.includes('Failed to fetch')) {
+        results.message = "Network error during write test. Check your internet connection.";
+      } else {
+        results.details.corsEnabled = undefined; // Unknown
+        results.message = `AWS S3 write permission test failed: ${writeError.message || 'Unknown error'}`;
       }
-    } catch (headError) {
-      console.error("AWS S3 bucket access test failed:", headError);
-      results.message = "AWS S3 bucket access failed. Check if the bucket exists and is accessible.";
     }
   } catch (error) {
-    console.error("AWS S3 credentials test failed:", error);
-    results.message = "AWS S3 credentials test failed: " + (error instanceof Error ? error.message : String(error));
+    console.error("AWS S3 general test failed:", error);
+    results.message = "AWS S3 test failed: " + (error instanceof Error ? error.message : String(error));
   }
   
   return results;
@@ -305,25 +381,46 @@ export const uploadToAwsS3 = async (
   
   try {
     // Test connectivity before attempting upload
+    console.log("Testing AWS connectivity before upload");
     const connectivityTest = await testAwsConnectivity();
+    
     if (!connectivityTest.success) {
+      console.error("AWS connectivity test failed:", connectivityTest.message);
+      
       // Check if the bucket exists in available buckets
-      if (connectivityTest.details.availableBuckets && 
+      if (connectivityTest.details.credentialsValid && 
+          connectivityTest.details.availableBuckets && 
           connectivityTest.details.availableBuckets.length > 0 && 
           !connectivityTest.details.availableBuckets.includes(credentials.bucket)) {
         throw new Error(`Bucket "${credentials.bucket}" not found. Available buckets: ${connectivityTest.details.availableBuckets.join(', ')}`);
       }
+      
+      // If credentials are valid but bucket is inaccessible, provide specific guidance
+      if (connectivityTest.details.credentialsValid && !connectivityTest.details.bucketAccessible) {
+        throw new Error(`Cannot access bucket "${credentials.bucket}". Make sure the bucket exists and you have permission to access it.`);
+      }
+      
+      // If credentials are valid and bucket is accessible but write permission is denied
+      if (connectivityTest.details.credentialsValid && 
+          connectivityTest.details.bucketAccessible && 
+          !connectivityTest.details.writePermission) {
+        throw new Error(`You don't have permission to write to bucket "${credentials.bucket}". Check your IAM permissions.`);
+      }
+      
       throw new Error(`AWS S3 connectivity issue: ${connectivityTest.message}`);
     }
     
-    // Create S3 client
+    // Create S3 client with retry options
     const s3Client = new S3Client({
       region: credentials.region,
       credentials: {
         accessKeyId: credentials.accessKeyId,
         secretAccessKey: credentials.secretAccessKey
-      }
+      },
+      maxAttempts: 3
     });
+    
+    console.log(`Uploading to S3: ${credentials.bucket}/${fullPath}`);
     
     // Use Upload from @aws-sdk/lib-storage for multipart upload support
     const upload = new Upload({

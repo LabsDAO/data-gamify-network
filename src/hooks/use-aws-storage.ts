@@ -9,7 +9,8 @@ import {
   isUsingRealAwsStorage,
   isUsingCustomAwsCredentials,
   testAwsConnectivity,
-  listAwsBuckets
+  listAwsBuckets,
+  saveAwsCredentials
 } from '@/utils/awsStorage';
 
 interface UseAwsStorageOptions {
@@ -59,6 +60,16 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       return buckets;
     } catch (error) {
       console.error("Failed to fetch available buckets:", error);
+      
+      // Show error toast only if it's not a network error (which would be annoying during development)
+      if (error instanceof Error && !error.message.includes("Network")) {
+        toast({
+          title: "Failed to fetch S3 buckets",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+      
       return [];
     }
   };
@@ -74,7 +85,9 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     });
     
     try {
+      console.log("Starting AWS S3 connectivity test");
       const result = await testAwsConnectivity();
+      console.log("AWS S3 connectivity test result:", result);
       
       // Update available buckets from test result
       if (result.details.availableBuckets && result.details.availableBuckets.length > 0) {
@@ -100,6 +113,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       return result;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error testing AWS connection');
+      console.error("AWS connection test error:", error);
       
       setConnectionStatus({
         tested: true,
@@ -222,6 +236,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       }, 300);
       
       // Perform the actual AWS S3 upload
+      console.log(`Starting upload of ${file.name} to AWS S3`);
       const url = await uploadToAwsS3(file, options.path);
       
       // Clear the progress interval
@@ -297,14 +312,20 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     bucket: string;
   }) => {
     try {
+      console.log("Updating AWS credentials:", {
+        accessKeyId: newCredentials.accessKeyId.substring(0, 5) + "...",
+        region: newCredentials.region,
+        bucket: newCredentials.bucket
+      });
+      
       // Save the new credentials
       const updatedCreds = {
         ...credentials,
         ...newCredentials
       };
       
-      // Make sure we're using custom credentials
-      localStorage.setItem('aws_credentials', JSON.stringify(updatedCreds));
+      // Save credentials to localStorage
+      saveAwsCredentials(updatedCreds);
       
       // Test the new credentials immediately
       setConnectionStatus({

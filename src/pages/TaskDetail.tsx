@@ -140,21 +140,6 @@ const TaskDetail = () => {
     }
   }, [storageOption, connectionStatus.tested]);
   
-  if (!task) {
-    return (
-      <div className="container mx-auto px-4 py-20 text-center">
-        <h1 className="text-2xl font-bold mb-4">Task not found</h1>
-        <p className="mb-6">The task you're looking for doesn't exist or has been removed.</p>
-        <button 
-          onClick={() => navigate('/dashboard')}
-          className="px-6 py-2 bg-primary text-white rounded-full"
-        >
-          Return to Dashboard
-        </button>
-      </div>
-    );
-  }
-  
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
@@ -336,6 +321,21 @@ const TaskDetail = () => {
     setPreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
   
+  if (!task) {
+    return (
+      <div className="container mx-auto px-4 py-20 text-center">
+        <h1 className="text-2xl font-bold mb-4">Task not found</h1>
+        <p className="mb-6">The task you're looking for doesn't exist or has been removed.</p>
+        <button 
+          onClick={() => navigate('/dashboard')}
+          className="px-6 py-2 bg-primary text-white rounded-full"
+        >
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
+  
   const totalPointsPossible = task.pointsPerUpload + task.pointsPerLabel;
   
   return (
@@ -446,7 +446,8 @@ const TaskDetail = () => {
               </p>
             </div>
             
-            {files.length > 0 && (
+            {
+              files.length > 0 && (
               <div className="mb-6">
                 <h3 className="font-semibold mb-2">Selected Files ({files.length})</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto p-2">
