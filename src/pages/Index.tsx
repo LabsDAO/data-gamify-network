@@ -34,8 +34,8 @@ const Index = () => {
 
   const features = [
     {
-      title: 'Upload Images',
-      description: 'Securely upload images to contribute to AI advancement.',
+      title: 'Upload Data',
+      description: 'Securely upload images, voice recordings, or text to contribute to AI advancement.',
       icon: Upload,
       color: 'from-blue-500 to-cyan-500'
     },
