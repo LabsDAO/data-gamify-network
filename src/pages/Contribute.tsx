@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePrivy } from '@privy-io/react-auth';
@@ -18,6 +17,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Mock data for available tasks
 const allTasks = [
@@ -128,6 +128,7 @@ const Contribute = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [displayedTasks, setDisplayedTasks] = useState(allTasks);
+  const isMobile = useIsMobile();
 
   // Filter tasks based on search term, category, and difficulty
   useEffect(() => {
@@ -165,7 +166,7 @@ const Contribute = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 md:py-16">
+    <div className={`container mx-auto px-4 ${isMobile ? 'pt-20 pb-8' : 'py-16'}`}>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-bold">Contribute to Datasets</h1>
@@ -226,7 +227,7 @@ const Contribute = () => {
       
       {/* Tasks grid */}
       {displayedTasks.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {displayedTasks.map(task => (
             <Card 
               key={task.id} 

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePrivy } from '@privy-io/react-auth';
@@ -19,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Predefined categories
 const categories = [
@@ -38,6 +38,7 @@ const RequestPage = () => {
   const navigate = useNavigate();
   const { authenticated, login } = usePrivy();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   
   const [formData, setFormData] = useState({
     title: '',
@@ -129,7 +130,7 @@ const RequestPage = () => {
   };
   
   return (
-    <div className="container mx-auto px-4 py-8 md:py-16 max-w-4xl">
+    <div className={`container mx-auto px-4 ${isMobile ? 'pt-20 pb-8' : 'py-16'} max-w-4xl`}>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-bold">Request Data Collection Challenge</h1>
