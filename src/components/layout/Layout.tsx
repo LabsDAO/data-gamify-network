@@ -35,8 +35,10 @@ const Layout = () => {
         </Sheet>
       </div>
       
-      <main className="flex-1">
-        <Outlet />
+      <main className="flex-1 flex justify-center">
+        <div className="w-full max-w-7xl">
+          <Outlet />
+        </div>
       </main>
       
       {/* Add safe area padding for mobile devices with notches */}

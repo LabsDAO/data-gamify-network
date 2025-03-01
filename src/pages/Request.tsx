@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePrivy } from '@privy-io/react-auth';
@@ -131,7 +132,7 @@ const RequestPage = () => {
   
   return (
     <div className={`container mx-auto px-4 ${isMobile ? 'pt-20 pb-8' : 'py-16'} max-w-4xl`}>
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-bold">Request Data Collection Challenge</h1>
           <p className="text-muted-foreground mt-2">
@@ -139,14 +140,16 @@ const RequestPage = () => {
           </p>
         </div>
         
-        <Button 
-          variant="outline" 
-          onClick={() => navigate('/contribute')}
-          className="flex items-center gap-2"
-        >
-          <Database className="w-4 h-4" />
-          Back to Challenges
-        </Button>
+        <div className="self-center">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/contribute')}
+            className="flex items-center gap-2"
+          >
+            <Database className="w-4 h-4" />
+            Back to Challenges
+          </Button>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

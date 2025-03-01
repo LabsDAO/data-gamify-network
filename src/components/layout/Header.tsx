@@ -69,39 +69,41 @@ const Header = () => {
         isScrolled ? 'glass-morphism shadow-md' : 'bg-transparent'
       )}
     >
-      <div className="container mx-auto flex justify-between items-center">
-        {/* Logo */}
-        <NavLink 
-          to="/" 
-          className="flex items-center gap-1 md:gap-2 font-bold text-lg md:text-xl lg:text-2xl"
-        >
-          <img 
-            src="/lovable-uploads/3c0d4a69-03a7-4f9f-b704-73bcc535ddef.png" 
-            alt="AI Marketplace Logo" 
-            className="h-7 md:h-8 lg:h-10"
+      <div className="container mx-auto flex justify-center items-center">
+        <div className="flex justify-between items-center w-full max-w-7xl">
+          {/* Logo */}
+          <NavLink 
+            to="/" 
+            className="flex items-center gap-1 md:gap-2 font-bold text-lg md:text-xl lg:text-2xl"
+          >
+            <img 
+              src="/lovable-uploads/3c0d4a69-03a7-4f9f-b704-73bcc535ddef.png" 
+              alt="AI Marketplace Logo" 
+              className="h-7 md:h-8 lg:h-10"
+            />
+            <span className="text-gradient">AI Marketplace</span>
+          </NavLink>
+
+          {/* Desktop Navigation */}
+          <DesktopNavigation 
+            handleAuthAction={handleAuthAction}
+            authenticated={authenticated}
           />
-          <span className="text-gradient">AI Marketplace</span>
-        </NavLink>
 
-        {/* Desktop Navigation */}
-        <DesktopNavigation 
-          handleAuthAction={handleAuthAction}
-          authenticated={authenticated}
-        />
+          {/* Mobile Menu Button */}
+          <MobileMenuButton 
+            isOpen={isMenuOpen} 
+            toggleMenu={toggleMenu} 
+          />
 
-        {/* Mobile Menu Button */}
-        <MobileMenuButton 
-          isOpen={isMenuOpen} 
-          toggleMenu={toggleMenu} 
-        />
-
-        {/* Mobile Menu */}
-        <MobileNavigation 
-          isMenuOpen={isMenuOpen}
-          setIsMenuOpen={setIsMenuOpen}
-          handleAuthAction={handleAuthAction}
-          authenticated={authenticated}
-        />
+          {/* Mobile Menu */}
+          <MobileNavigation 
+            isMenuOpen={isMenuOpen}
+            setIsMenuOpen={setIsMenuOpen}
+            handleAuthAction={handleAuthAction}
+            authenticated={authenticated}
+          />
+        </div>
       </div>
     </header>
   );
