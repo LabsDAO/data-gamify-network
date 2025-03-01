@@ -41,10 +41,19 @@ const MobileNavigation = ({
         </NavLink>
         
         <NavLink
-          to="/request"
+          to="/agents"
           onClick={() => setIsMenuOpen(false)}
           mobile
           style={{ animationDelay: '100ms' }}
+        >
+          AI Agents
+        </NavLink>
+        
+        <NavLink
+          to="/request"
+          onClick={() => setIsMenuOpen(false)}
+          mobile
+          style={{ animationDelay: '150ms' }}
         >
           Request Data
         </NavLink>
@@ -54,7 +63,7 @@ const MobileNavigation = ({
             to="/dashboard"
             onClick={() => setIsMenuOpen(false)}
             mobile
-            style={{ animationDelay: '150ms' }}
+            style={{ animationDelay: '200ms' }}
           >
             Dashboard
           </NavLink>
@@ -67,7 +76,7 @@ const MobileNavigation = ({
             handleAuthAction();
           }}
           mobile
-          style={{ animationDelay: user ? '200ms' : '150ms' }}
+          style={{ animationDelay: user ? '250ms' : '200ms' }}
         />
       </nav>
     </div>
