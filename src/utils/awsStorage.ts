@@ -11,8 +11,8 @@ type AWSCredentials = {
   bucket: string;
 };
 
-// Default credentials with the provided values
-const DEFAULT_CREDENTIALS: AWSCredentials = {
+// Real credentials with the provided values
+const REAL_CREDENTIALS: AWSCredentials = {
   accessKeyId: "AKIAXZ5NGJRVYNNHVYFG",
   secretAccessKey: "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",
   region: "us-east-1",
@@ -63,7 +63,7 @@ export const validateFile = (file: File): { valid: boolean; error?: string } => 
 };
 
 /**
- * Get AWS S3 credentials from localStorage or use defaults
+ * Get AWS S3 credentials from localStorage or use real credentials
  */
 export const getAwsCredentials = (): AWSCredentials => {
   const storedCredentials = localStorage.getItem('aws_credentials');
@@ -74,7 +74,7 @@ export const getAwsCredentials = (): AWSCredentials => {
       console.error("Failed to parse stored AWS credentials", e);
     }
   }
-  return DEFAULT_CREDENTIALS;
+  return REAL_CREDENTIALS;
 };
 
 /**
@@ -88,15 +88,15 @@ export const saveAwsCredentials = (credentials: AWSCredentials): void => {
  * Check if custom AWS credentials are being used
  */
 export const isUsingCustomAwsCredentials = (): boolean => {
-  // Since we now have default credentials, check if they've been overridden
+  // Since we now have real credentials, check if they've been overridden
   const creds = getAwsCredentials();
-  const areDefaultsBeingUsed = 
-    creds.accessKeyId === DEFAULT_CREDENTIALS.accessKeyId && 
-    creds.secretAccessKey === DEFAULT_CREDENTIALS.secretAccessKey &&
-    creds.bucket === DEFAULT_CREDENTIALS.bucket;
+  const areRealCredsBeingUsed = 
+    creds.accessKeyId === REAL_CREDENTIALS.accessKeyId && 
+    creds.secretAccessKey === REAL_CREDENTIALS.secretAccessKey &&
+    creds.bucket === REAL_CREDENTIALS.bucket;
   
-  // Return true if credentials are stored (custom) or the defaults are used
-  return localStorage.getItem('aws_credentials') !== null || areDefaultsBeingUsed;
+  // Return true if credentials are stored (custom) or the real ones are used
+  return localStorage.getItem('aws_credentials') !== null || areRealCredsBeingUsed;
 };
 
 /**
@@ -256,17 +256,6 @@ export const testAwsConnectivity = async (): Promise<{
       errorDetails: undefined
     }
   };
-  
-  // Check if using mock credentials
-  const usingMockCredentials = 
-    credentials.accessKeyId === DEFAULT_CREDENTIALS.accessKeyId && 
-    credentials.secretAccessKey === DEFAULT_CREDENTIALS.secretAccessKey;
-  
-  if (usingMockCredentials) {
-    results.message = "You are using the demonstration AWS credentials. These won't work for real uploads. Please update with your own AWS credentials.";
-    results.details.errorDetails = "Using demonstration AWS credentials";
-    return results;
-  }
   
   try {
     // Check if credentials are provided
@@ -450,15 +439,6 @@ export const uploadToAwsS3 = async (
   // Ensure region is set
   if (!credentials.region) {
     credentials.region = 'us-east-1'; // Default to us-east-1 if not specified
-  }
-  
-  // Check if using demo credentials
-  const usingDemoCredentials = 
-    credentials.accessKeyId === DEFAULT_CREDENTIALS.accessKeyId && 
-    credentials.secretAccessKey === DEFAULT_CREDENTIALS.secretAccessKey;
-  
-  if (usingDemoCredentials) {
-    throw new Error('You are using the demonstration AWS credentials. These will not work for real uploads. Please update with your own AWS credentials.');
   }
   
   // Normalize path (make sure it ends with a slash if not empty)

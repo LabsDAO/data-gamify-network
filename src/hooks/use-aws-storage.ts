@@ -137,7 +137,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       // Get the current credentials
       const credentials = getAwsCredentials();
       
-      // For any credentials, run the actual test
+      // Run the actual test
       const result = await testAwsConnectivity();
       console.log("AWS S3 connectivity test result:", result);
       
