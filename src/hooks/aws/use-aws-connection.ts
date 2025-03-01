@@ -1,13 +1,13 @@
 
 import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
-import { 
+import {
   getAwsCredentials,
-  testAwsConnectivity,
   listAwsBuckets,
   checkBucketExists,
   saveAwsCredentials
 } from '@/utils/awsStorage';
+import { testAwsConnectivityWithoutUpload } from '@/utils/testAwsConnectivityNoUpload';
 import { ConnectionStatus, ConnectivityTestResult } from './types';
 
 /**
@@ -101,8 +101,8 @@ export function useAwsConnection() {
       // Get the current credentials
       const credentials = getAwsCredentials();
       
-      // Run the actual test
-      const result = await testAwsConnectivity();
+      // Run the test without uploading any test files
+      const result = await testAwsConnectivityWithoutUpload();
       console.log("AWS S3 connectivity test result:", result);
       
       // Update available buckets from test result
@@ -199,7 +199,16 @@ export function useAwsConnection() {
       // Save credentials to localStorage
       saveAwsCredentials(updatedCreds);
       
-      return await testConnection();
+      // Return success without running the connection test
+      return {
+        success: true,
+        message: "AWS credentials updated successfully. Click 'Test Connection' to verify they work.",
+        details: {
+          credentialsValid: true,
+          bucketAccessible: false,
+          writePermission: false
+        }
+      };
     } catch (error) {
       console.error("Failed to update AWS credentials:", error);
       

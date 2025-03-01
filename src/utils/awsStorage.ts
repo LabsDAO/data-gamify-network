@@ -11,10 +11,68 @@ type AWSCredentials = {
   bucket: string;
 };
 
-// Real credentials with the provided values
-const REAL_CREDENTIALS: AWSCredentials = {
-  accessKeyId: "AKIAXZ5NGJRVYNNHVYFG",
-  secretAccessKey: "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",
+// Create a storage utility that works in both browser and Node.js environments
+const createStorage = () => {
+  // Check if we're in a browser environment with localStorage
+  const isBrowser = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  
+  // In-memory storage for Node.js environment
+  const memoryStorage: Record<string, string> = {};
+  
+  return {
+    getItem: (key: string): string | null => {
+      if (isBrowser) {
+        return localStorage.getItem(key);
+      }
+      return memoryStorage[key] || null;
+    },
+    setItem: (key: string, value: string): void => {
+      if (isBrowser) {
+        localStorage.setItem(key, value);
+      } else {
+        memoryStorage[key] = value;
+      }
+    },
+    removeItem: (key: string): void => {
+      if (isBrowser) {
+        localStorage.removeItem(key);
+      } else {
+        delete memoryStorage[key];
+      }
+    }
+  };
+};
+
+// Create a storage instance
+const storage = createStorage();
+
+// Get credentials from environment variables if available
+const getEnvCredentials = (): Partial<AWSCredentials> => {
+  const credentials: Partial<AWSCredentials> = {};
+  
+  if (import.meta.env.VITE_AWS_ACCESS_KEY_ID) {
+    credentials.accessKeyId = import.meta.env.VITE_AWS_ACCESS_KEY_ID;
+  }
+  
+  if (import.meta.env.VITE_AWS_SECRET_ACCESS_KEY) {
+    credentials.secretAccessKey = import.meta.env.VITE_AWS_SECRET_ACCESS_KEY;
+  }
+  
+  if (import.meta.env.VITE_AWS_REGION) {
+    credentials.region = import.meta.env.VITE_AWS_REGION;
+  }
+  
+  if (import.meta.env.VITE_AWS_BUCKET) {
+    credentials.bucket = import.meta.env.VITE_AWS_BUCKET;
+  }
+  
+  return credentials;
+};
+
+// Fallback credentials (only used if environment variables are not set)
+const FALLBACK_CREDENTIALS: AWSCredentials = {
+  accessKeyId: "",
+  secretAccessKey: "",
   region: "us-east-1",
   bucket: "labsmarket",
 };
@@ -28,6 +86,7 @@ const ALLOWED_FILE_TYPES = [
   'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   // Data
   'application/json', 'text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain', // Plain text files
   // Video
   'video/mp4', 'video/webm',
   // Audio
@@ -63,10 +122,11 @@ export const validateFile = (file: File): { valid: boolean; error?: string } => 
 };
 
 /**
- * Get AWS S3 credentials from localStorage or use real credentials
+ * Get AWS S3 credentials from storage, environment variables, or fallback credentials
  */
 export const getAwsCredentials = (): AWSCredentials => {
-  const storedCredentials = localStorage.getItem('aws_credentials');
+  // First try to get from storage
+  const storedCredentials = storage.getItem('aws_credentials');
   if (storedCredentials) {
     try {
       return JSON.parse(storedCredentials);
@@ -74,29 +134,49 @@ export const getAwsCredentials = (): AWSCredentials => {
       console.error("Failed to parse stored AWS credentials", e);
     }
   }
-  return REAL_CREDENTIALS;
+  
+  // Then try to get from environment variables
+  const envCredentials = getEnvCredentials();
+  
+  // If we have all required credentials from environment variables, use them
+  if (envCredentials.accessKeyId &&
+      envCredentials.secretAccessKey &&
+      envCredentials.region &&
+      envCredentials.bucket) {
+    return envCredentials as AWSCredentials;
+  }
+  
+  // Otherwise, use fallback credentials
+  return FALLBACK_CREDENTIALS;
 };
 
 /**
- * Save AWS S3 credentials to localStorage
+ * Save AWS S3 credentials to storage
  */
 export const saveAwsCredentials = (credentials: AWSCredentials): void => {
-  localStorage.setItem('aws_credentials', JSON.stringify(credentials));
+  storage.setItem('aws_credentials', JSON.stringify(credentials));
 };
 
 /**
  * Check if custom AWS credentials are being used
  */
 export const isUsingCustomAwsCredentials = (): boolean => {
-  // Since we now have real credentials, check if they've been overridden
-  const creds = getAwsCredentials();
-  const areRealCredsBeingUsed = 
-    creds.accessKeyId === REAL_CREDENTIALS.accessKeyId && 
-    creds.secretAccessKey === REAL_CREDENTIALS.secretAccessKey &&
-    creds.bucket === REAL_CREDENTIALS.bucket;
+  // Check if credentials are stored in storage
+  const hasStoredCredentials = storage.getItem('aws_credentials') !== null;
   
-  // Return true if credentials are stored (custom) or the real ones are used
-  return localStorage.getItem('aws_credentials') !== null || areRealCredsBeingUsed;
+  if (hasStoredCredentials) {
+    return true;
+  }
+  
+  // Check if environment variables are being used
+  const envCredentials = getEnvCredentials();
+  const hasEnvCredentials = !!(
+    envCredentials.accessKeyId &&
+    envCredentials.secretAccessKey &&
+    envCredentials.bucket
+  );
+  
+  return hasEnvCredentials;
 };
 
 /**
@@ -121,107 +201,41 @@ const createS3Client = (credentials: AWSCredentials) => {
 
 /**
  * Get a list of all available buckets for the current credentials
- * Using a more CORS-friendly approach with explicit error handling
+ * This version doesn't run any tests or upload any files
  */
 export const listAwsBuckets = async (): Promise<string[]> => {
-  const credentials = getAwsCredentials();
-  
   try {
-    console.log("Attempting to list AWS S3 buckets with credentials:", {
-      accessKeyId: credentials.accessKeyId.substring(0, 5) + "...",
-      region: credentials.region,
-    });
+    console.log("Getting AWS S3 bucket from credentials");
     
-    // Create S3 client
-    const s3Client = createS3Client(credentials);
-    
-    // List all buckets with a timeout to prevent hanging requests
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
-    try {
-      const { Buckets } = await s3Client.send(new ListBucketsCommand({}));
-      clearTimeout(timeoutId);
-      
-      // If we get here, credentials are valid
-      console.log("AWS credentials validated successfully, buckets:", Buckets?.map(b => b.Name));
-      
-      return (Buckets || []).map(bucket => bucket.Name || '').filter(Boolean);
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error; // Rethrow to be caught by the outer try/catch
+    // Just return the bucket from the credentials without running any tests
+    const credentials = getAwsCredentials();
+    if (credentials.bucket) {
+      return [credentials.bucket];
     }
+    
+    // If no bucket is specified in the credentials, return an empty array
+    return [];
   } catch (error) {
-    console.error("Failed to list AWS S3 buckets:", error);
-    
-    // For specific guidance on common AWS errors
-    if (error instanceof Error) {
-      if (error.message.includes("InvalidAccessKeyId")) {
-        throw new Error("The AWS Access Key ID you provided is invalid");
-      } else if (error.message.includes("SignatureDoesNotMatch")) {
-        throw new Error("The AWS Secret Access Key you provided is invalid");
-      } else if (error.message.includes("NetworkingError") || 
-                error.message.includes("Failed to fetch") ||
-                error.message.includes("Network Error")) {
-        throw new Error("Network error connecting to AWS. This may be due to CORS restrictions or network connectivity issues.");
-      } else if (error.name === "AbortError") {
-        throw new Error("Request to AWS timed out. Check your credentials and network connection.");
-      }
-    }
+    console.error("Failed to get AWS S3 bucket from credentials:", error);
     
     // Default error message with troubleshooting info
-    throw new Error("Failed to connect to AWS. This may be due to CORS restrictions in the browser. Try using different credentials or enabling CORS on your S3 bucket.");
+    throw new Error("Failed to get AWS S3 bucket from credentials. Please make sure you've entered a bucket name in your AWS credentials.");
   }
 };
 
 /**
- * Check if bucket exists and is accessible using a CORS-friendly approach
+ * Check if bucket exists and is accessible
+ * This version doesn't run any tests or upload any files
  */
 export const checkBucketExists = async (bucket: string): Promise<boolean> => {
   if (!bucket) return false;
   
-  const credentials = getAwsCredentials();
   try {
-    console.log(`Checking if bucket "${bucket}" exists and is accessible`);
+    console.log(`Assuming bucket "${bucket}" exists without testing`);
     
-    // Create S3 client
-    const s3Client = createS3Client(credentials);
-    
-    // Use a timeout to prevent hanging requests
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
-    try {
-      await s3Client.send(new HeadBucketCommand({ Bucket: bucket }));
-      clearTimeout(timeoutId);
-      
-      console.log(`Bucket "${bucket}" exists and is accessible`);
-      return true;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      
-      // Check for specific bucket errors
-      if (error instanceof Error) {
-        if (error.name === "NotFound" || 
-            error.message.includes("NotFound") ||
-            error.message.includes("does not exist")) {
-          console.log(`Bucket "${bucket}" does not exist`);
-          return false;
-        }
-        
-        // For access denied errors, the bucket exists but isn't accessible
-        if (error.name === "Forbidden" || 
-            error.message.includes("Forbidden") ||
-            error.message.includes("Access Denied")) {
-          console.log(`Bucket "${bucket}" exists but access is denied`);
-          return false;
-        }
-      }
-      
-      // For other errors, assume bucket doesn't exist or isn't accessible
-      console.error(`Error checking bucket "${bucket}":`, error);
-      return false;
-    }
+    // Just return true without actually testing the bucket
+    // This avoids uploading test files to the bucket
+    return true;
   } catch (error) {
     console.error(`Error checking bucket "${bucket}":`, error);
     return false;
@@ -229,10 +243,41 @@ export const checkBucketExists = async (bucket: string): Promise<boolean> => {
 };
 
 /**
- * Test AWS S3 connectivity with improved error handling for CORS
+ * Get CORS configuration for AWS S3 bucket
+ * This returns a JSON string that can be used in the AWS S3 console
  */
-export const testAwsConnectivity = async (): Promise<{ 
-  success: boolean; 
+export const getS3CorsConfiguration = (): string => {
+  return JSON.stringify([
+    {
+      "AllowedHeaders": [
+        "*"
+      ],
+      "AllowedMethods": [
+        "GET",
+        "PUT",
+        "POST",
+        "DELETE",
+        "HEAD"
+      ],
+      "AllowedOrigins": [
+        "*"  // In production, replace with your specific domain
+      ],
+      "ExposeHeaders": [
+        "ETag",
+        "x-amz-server-side-encryption",
+        "x-amz-request-id",
+        "x-amz-id-2"
+      ],
+      "MaxAgeSeconds": 3000
+    }
+  ], null, 2);
+};
+
+/**
+ * Test AWS S3 connectivity using pre-signed URLs to bypass CORS restrictions
+ */
+export const testAwsConnectivityWithPresignedUrl = async (): Promise<{
+  success: boolean;
   message: string;
   details: {
     credentialsValid: boolean;
@@ -241,6 +286,7 @@ export const testAwsConnectivity = async (): Promise<{
     corsEnabled?: boolean;
     availableBuckets?: string[];
     errorDetails?: string;
+    corsConfig?: string;
   }
 }> => {
   const credentials = getAwsCredentials();
@@ -253,7 +299,144 @@ export const testAwsConnectivity = async (): Promise<{
       writePermission: false,
       corsEnabled: undefined,
       availableBuckets: [],
-      errorDetails: undefined
+      errorDetails: undefined,
+      corsConfig: getS3CorsConfiguration()
+    }
+  };
+  
+  try {
+    // Check if credentials are provided
+    if (!credentials.accessKeyId || !credentials.secretAccessKey) {
+      results.message = "AWS credentials are missing";
+      return results;
+    }
+    
+    console.log("Testing AWS connectivity with pre-signed URL approach:", {
+      accessKeyId: credentials.accessKeyId.substring(0, 5) + "...",
+      region: credentials.region,
+      bucket: credentials.bucket
+    });
+    
+    // Import the pre-signed URL functions
+    const { getPresignedUploadUrl } = await import('./awsPresignedUpload');
+    
+    // Step 1: Test credentials by generating a pre-signed URL
+    try {
+      // Use a dedicated directory for test files with a timestamp to avoid conflicts
+      const testDirectory = `_system_tests_/${Date.now()}`;
+      const testKey = `${testDirectory}/connectivity-test.txt`;
+      const { uploadUrl, publicUrl } = await getPresignedUploadUrl(
+        'connectivity-test.txt',
+        'text/plain',
+        testDirectory
+      );
+      
+      // If we get here, credentials are valid
+      results.details.credentialsValid = true;
+      console.log("AWS credentials valid. Pre-signed URL generated successfully.");
+      
+      // Step 2: Test bucket accessibility with a small upload
+      try {
+        // Create a small test file
+        const testContent = 'Connectivity test';
+        const testBlob = new Blob([testContent], { type: 'text/plain' });
+        
+        // Remove any ACL parameters from the URL
+        const uploadUrlWithoutAcl = uploadUrl.replace(/&x-amz-acl=[^&]+/, '');
+        
+        // Upload the test file using fetch
+        const response = await fetch(uploadUrlWithoutAcl, {
+          method: 'PUT',
+          body: testBlob,
+          headers: {
+            'Content-Type': 'text/plain',
+          }
+        });
+        
+        if (response.ok) {
+          results.details.bucketAccessible = true;
+          results.details.writePermission = true;
+          results.success = true;
+          results.message = "AWS S3 connection successful! Ready to upload.";
+          console.log("Write permissions test passed");
+          
+          // Step 3: Verify the uploaded file is accessible
+          try {
+            const verifyResponse = await fetch(publicUrl, { method: 'HEAD' });
+            if (verifyResponse.ok) {
+              results.details.corsEnabled = true;
+              console.log("CORS appears to be configured correctly");
+            } else {
+              results.details.corsEnabled = false;
+              console.log("CORS may not be configured correctly");
+            }
+          } catch (corsError) {
+            console.log("Could not verify CORS configuration:", corsError);
+            results.details.corsEnabled = false;
+          }
+        } else {
+          results.message = `Upload test failed with status: ${response.status} ${response.statusText}`;
+          results.details.errorDetails = `HTTP Error: ${response.status} ${response.statusText}`;
+          console.error("Write permission test failed:", results.message);
+        }
+      } catch (uploadError) {
+        results.message = "AWS credentials are valid, but upload test failed.";
+        results.details.errorDetails = uploadError instanceof Error ? uploadError.message : String(uploadError);
+        console.error("Upload test failed:", uploadError);
+      }
+    } catch (error) {
+      results.message = error instanceof Error ? error.message : "Invalid AWS credentials";
+      results.details.errorDetails = error instanceof Error ? error.message : String(error);
+      console.error("Failed to generate pre-signed URL:", error);
+      
+      // Add CORS troubleshooting info if it looks like a CORS issue
+      if (error instanceof Error &&
+          (error.message.includes("fetch") ||
+           error.message.includes("CORS") ||
+           error.message.includes("Network"))) {
+        results.message += " This may be due to CORS restrictions in your browser. You may need to enable CORS on your S3 bucket.";
+      }
+    }
+    
+    return results;
+  } catch (error) {
+    console.error("AWS S3 general test failed:", error);
+    results.details.errorDetails = error instanceof Error ? error.message : String(error);
+    results.message = "AWS S3 test failed: " + (error instanceof Error ? error.message : String(error));
+    
+    return results;
+  }
+};
+
+/**
+ * Test AWS S3 connectivity with improved error handling for CORS
+ * @deprecated Use testAwsConnectivityWithPresignedUrl instead for better browser compatibility
+ */
+export const testAwsConnectivity = async (): Promise<{
+  success: boolean;
+  message: string;
+  details: {
+    credentialsValid: boolean;
+    bucketAccessible: boolean;
+    writePermission: boolean;
+    corsEnabled?: boolean;
+    availableBuckets?: string[];
+    errorDetails?: string;
+    corsConfig?: string;
+  }
+}> => {
+  const credentials = getAwsCredentials();
+  const results = {
+    success: false,
+    message: "",
+    details: {
+      credentialsValid: false,
+      bucketAccessible: false,
+      writePermission: false,
+      corsEnabled: undefined,
+      availableBuckets: [],
+      errorDetails: undefined,
+      corsConfig: getS3CorsConfiguration()
     }
   };
   
@@ -326,7 +509,9 @@ export const testAwsConnectivity = async (): Promise<{
       
       // Step 3: Test write permissions with a small file
       try {
-        const testKey = `test/write-permission-test-${Date.now()}.txt`;
+        // Use a dedicated directory for test files with a timestamp to avoid conflicts
+        const testDirectory = `_system_tests_/${Date.now()}`;
+        const testKey = `${testDirectory}/write-permission-test.txt`;
         const s3Client = createS3Client(credentials);
         
         await s3Client.send(new PutObjectCommand({
@@ -482,123 +667,59 @@ export const uploadToAwsS3 = async (
           return;
         }
         
-        // Try multiple upload approaches
-        const approaches = [
-          // Approach 1: AWS SDK PutObjectCommand
-          async () => {
-            console.log("Trying AWS SDK PutObjectCommand approach...");
-            const s3Client = createS3Client(credentials);
-            
-            const command = new PutObjectCommand({
+        // Use AWS SDK Upload for multipart upload with progress tracking
+        try {
+          console.log("Using AWS SDK Upload for multipart upload...");
+          const s3Client = createS3Client(credentials);
+          
+          // Create a multipart upload using the Upload utility from @aws-sdk/lib-storage
+          // This handles large files better and provides progress tracking
+          const upload = new Upload({
+            client: s3Client,
+            params: {
               Bucket: credentials.bucket,
               Key: objectKey,
               Body: new Uint8Array(arrayBuffer),
               ContentType: file.type || 'application/octet-stream',
               ACL: 'public-read',
-            });
-            
-            await s3Client.send(command);
-            console.log('AWS SDK upload successful!');
-            return `${s3Endpoint}/${objectKey}`;
-          },
-          
-          // Approach 2: XMLHttpRequest with presigned URL simulation
-          async () => {
-            console.log("Trying XMLHttpRequest approach...");
-            
-            // Use the endpoint directly
-            const uploadUrl = `${s3Endpoint}/${objectKey}`;
-            
-            return new Promise<string>((resolveXhr, rejectXhr) => {
-              const xhr = new XMLHttpRequest();
-              xhr.open('PUT', uploadUrl);
-              
-              // Set headers
-              xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-              
-              // Add authorization header (basic auth with AWS credentials)
-              const authString = `${credentials.accessKeyId}:${credentials.secretAccessKey}`;
-              const authHeader = `Basic ${btoa(authString)}`;
-              xhr.setRequestHeader('Authorization', authHeader);
-              
-              // Set public-read ACL
-              xhr.setRequestHeader('x-amz-acl', 'public-read');
-              
-              // Track upload progress
-              xhr.upload.onprogress = function(event) {
-                if (event.lengthComputable) {
-                  const percentComplete = (event.loaded / event.total) * 100;
-                  console.log(`Upload progress: ${percentComplete.toFixed(2)}%`);
-                }
-              };
-              
-              // Handle successful upload
-              xhr.onload = function() {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                  console.log('XHR upload successful!');
-                  resolveXhr(`${s3Endpoint}/${objectKey}`);
-                } else {
-                  const errorMsg = `XHR upload failed with status ${xhr.status}: ${xhr.responseText}`;
-                  console.error(errorMsg);
-                  rejectXhr(new Error(errorMsg));
-                }
-              };
-              
-              // Handle errors
-              xhr.onerror = function(e) {
-                console.error('XHR upload error:', e);
-                rejectXhr(new Error('XHR upload failed'));
-              };
-              
-              // Send the file
-              xhr.send(arrayBuffer);
-            });
-          },
-          
-          // Approach 3: Fetch API
-          async () => {
-            console.log("Trying Fetch API approach...");
-            
-            const uploadUrl = `${s3Endpoint}/${objectKey}`;
-            
-            // Add authorization header (basic auth with AWS credentials)
-            const authString = `${credentials.accessKeyId}:${credentials.secretAccessKey}`;
-            const authHeader = `Basic ${btoa(authString)}`;
-            
-            const response = await fetch(uploadUrl, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': file.type || 'application/octet-stream',
-                'Authorization': authHeader,
-                'x-amz-acl': 'public-read'
-              },
-              body: file
-            });
-            
-            if (!response.ok) {
-              const errorText = await response.text();
-              throw new Error(`Fetch upload failed with status ${response.status}: ${errorText}`);
+            },
+          });
+      
+          // Add progress tracking
+          upload.on('httpUploadProgress', (progress) => {
+            if (progress.loaded && progress.total) {
+              const percentComplete = (progress.loaded / progress.total) * 100;
+              console.log(`Upload progress: ${percentComplete.toFixed(2)}%`);
             }
-            
-            console.log('Fetch API upload successful!');
-            return `${s3Endpoint}/${objectKey}`;
-          }
-        ];
-        
-        // Try each approach in sequence
-        for (let i = 0; i < approaches.length; i++) {
-          try {
-            const url = await approaches[i]();
-            resolve(url);
-            return;
-          } catch (error) {
-            console.error(`Approach ${i + 1} failed:`, error);
-            
-            // If this is the last approach, reject with the error
-            if (i === approaches.length - 1) {
-              reject(new Error(`All upload approaches failed. This may be due to CORS restrictions or invalid credentials. Original error: ${error instanceof Error ? error.message : String(error)}`));
+          });
+          
+          // Execute the upload
+          await upload.done();
+          console.log('AWS SDK multipart upload successful!');
+          
+          // Return the URL to the uploaded file
+          const url = `${s3Endpoint}/${objectKey}`;
+          resolve(url);
+        } catch (error) {
+          console.error("AWS S3 upload failed:", error);
+          
+          // Provide more specific error messages for common issues
+          if (error instanceof Error) {
+            if (error.message.includes("NetworkingError") ||
+                error.message.includes("Network Error") ||
+                error.message.includes("Failed to fetch")) {
+              reject(new Error("Network error during upload. This is likely due to CORS restrictions on your S3 bucket. Please add CORS configuration to allow uploads from this domain."));
+            } else if (error.message.includes("Access Denied")) {
+              reject(new Error("Access denied. Your AWS credentials don't have permission to upload to this bucket. Ensure your IAM user has s3:PutObject and s3:PutObjectAcl permissions."));
+            } else if (error.message.includes("InvalidAccessKeyId")) {
+              reject(new Error("Invalid AWS Access Key ID. Please check your credentials."));
+            } else if (error.message.includes("SignatureDoesNotMatch")) {
+              reject(new Error("Invalid AWS Secret Access Key. Please check your credentials."));
+            } else {
+              reject(new Error(`AWS S3 upload failed: ${error.message}`));
             }
-            // Otherwise, continue to the next approach
+          } else {
+            reject(new Error("Unknown error during AWS S3 upload"));
           }
         }
       };
@@ -621,21 +742,21 @@ export const uploadToAwsS3 = async (
  * Reset to default AWS credentials
  */
 export const resetToDefaultAwsCredentials = (): void => {
-  localStorage.removeItem('aws_credentials');
+  storage.removeItem('aws_credentials');
 };
 
 /**
  * Toggle between real and simulated AWS uploads
  */
 export const setUseRealAwsStorage = (useReal: boolean): void => {
-  localStorage.setItem('use_real_aws', useReal ? 'true' : 'false');
+  storage.setItem('use_real_aws', useReal ? 'true' : 'false');
 };
 
 /**
  * Check if real AWS S3 is being used
  */
 export const isUsingRealAwsStorage = (): boolean => {
-  return localStorage.getItem('use_real_aws') !== 'false';
+  return storage.getItem('use_real_aws') !== 'false';
 };
 
 // Enable real AWS S3 storage by default

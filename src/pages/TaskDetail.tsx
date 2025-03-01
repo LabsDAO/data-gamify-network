@@ -136,12 +136,10 @@ const TaskDetail = () => {
     if (storageOption === "aws") {
       setAwsCredentials(getAwsCredentials());
       
-      if (!connectionStatus.tested) {
-        console.log(`Testing AWS connection with path: ${uploadPath}`);
-        testConnection().catch(console.error);
-      }
+      // Only show the connection test UI, but don't run the test automatically
+      setShowConnectionTest(true);
     }
-  }, [storageOption, connectionStatus.tested, uploadPath]);
+  }, [storageOption]);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -178,16 +176,15 @@ const TaskDetail = () => {
 
   const handleUpdateAwsCredentials = async () => {
     try {
-      const result = await updateCredentials(awsCredentials);
+      // Save the credentials without running the connection test
+      saveAwsCredentials(awsCredentials);
       
-      if (result.success) {
-        setShowCredentialsDialog(false);
-        toast({
-          title: "AWS Credentials Updated",
-          description: "Your AWS S3 credentials have been updated and the connection is working.",
-          variant: "success"
-        });
-      }
+      setShowCredentialsDialog(false);
+      toast({
+        title: "AWS Credentials Updated",
+        description: "Your AWS S3 credentials have been saved. Click 'Test Connection' to verify they work.",
+        variant: "success"
+      });
     } catch (error) {
       console.error("Failed to update AWS credentials:", error);
       toast({
@@ -301,11 +298,27 @@ const TaskDetail = () => {
       }
     } catch (error) {
       console.error("Upload error:", error);
+      
+      // Show toast notification
       toast({
         title: "Upload failed",
         description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive"
       });
+      
+      // Add visible error message in the UI
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      const isNetworkError = errorMessage.includes('Network') ||
+                            errorMessage.includes('CORS') ||
+                            errorMessage.includes('fetch');
+      
+      // Show error message in UI for 10 seconds
+      setUploadedUrls([`Error: ${errorMessage}`]);
+      
+      // Clear error message after 10 seconds
+      setTimeout(() => {
+        setUploadedUrls([]);
+      }, 10000);
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -641,6 +654,16 @@ const TaskDetail = () => {
                                 </li>
                               )}
                             </ul>
+                            
+                            {connectionStatus.details?.corsEnabled === false && (
+                              <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md">
+                                <p className="font-medium text-amber-800 dark:text-amber-400 mb-1">CORS Configuration Required</p>
+                                <p className="text-xs mb-2">Your S3 bucket needs CORS configuration to allow browser uploads. Add this to your bucket CORS settings in the AWS console:</p>
+                                <pre className="text-xs bg-black/5 dark:bg-white/5 p-2 rounded overflow-auto max-h-32">
+                                  {connectionStatus.details?.corsConfig || ''}
+                                </pre>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -665,8 +688,15 @@ const TaskDetail = () => {
             
             {uploading && (
               <div className="mb-6">
-                <p className="text-sm font-medium mb-2">Uploading... {uploadProgress.toFixed(0)}%</p>
+                <p className="text-sm font-medium mb-2">
+                  Uploading to {storageOption === "aws" ? "AWS S3" : "OORT"}... {uploadProgress.toFixed(0)}%
+                </p>
                 <Progress value={uploadProgress} className="h-2" />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {storageOption === "aws"
+                    ? "Using pre-signed URL approach to bypass CORS restrictions"
+                    : "Using direct upload to OORT storage"}
+                </p>
               </div>
             )}
             
@@ -680,24 +710,72 @@ const TaskDetail = () => {
             
             {uploadedUrls.length > 0 && (
               <div className="mt-6">
-                <h3 className="font-semibold mb-2">
-                  Uploaded Files {storageOption === "aws" ? "(AWS S3)" : "(OORT labsmarket bucket)"}
-                </h3>
-                <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-input rounded-md">
-                  {uploadedUrls.map((url, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-background/50 rounded">
-                      <a 
-                        href={url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline text-sm truncate"
-                      >
-                        {url}
-                      </a>
-                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                {uploadedUrls[0]?.startsWith('Error:') ? (
+                  // Error message display
+                  <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <XCircle className="w-5 h-5 text-red-500" />
+                      <h3 className="font-semibold text-red-700 dark:text-red-400">
+                        Upload Failed
+                      </h3>
                     </div>
-                  ))}
-                </div>
+                    <p className="text-sm text-red-600 dark:text-red-400 mb-2">
+                      {uploadedUrls[0].substring(7)}
+                    </p>
+                    {storageOption === "aws" && (
+                      <div className="text-xs text-red-500 dark:text-red-500 mt-2">
+                        <p>Troubleshooting tips:</p>
+                        <ul className="list-disc list-inside mt-1">
+                          <li>Check your AWS credentials</li>
+                          <li>Verify your bucket name and permissions</li>
+                          <li>Try configuring CORS on your S3 bucket</li>
+                          <li>Check your network connection</li>
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Success message display
+                  <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <h3 className="font-semibold text-green-700 dark:text-green-400">
+                        Upload Successful!
+                      </h3>
+                    </div>
+                    <p className="text-sm text-green-600 dark:text-green-400 mb-2">
+                      {uploadedUrls.length} {uploadedUrls.length === 1 ? 'file' : 'files'} uploaded successfully to {storageOption === "aws" ? "AWS S3" : "OORT labsmarket bucket"}.
+                    </p>
+                    {storageOption === "aws" && (
+                      <p className="text-xs text-green-500 dark:text-green-500">
+                        Used pre-signed URL approach to bypass CORS restrictions.
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {!uploadedUrls[0]?.startsWith('Error:') && (
+                  <>
+                    <h3 className="font-semibold mb-2">
+                      Uploaded Files {storageOption === "aws" ? "(AWS S3)" : "(OORT labsmarket bucket)"}
+                    </h3>
+                    <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-input rounded-md">
+                      {uploadedUrls.map((url, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-background/50 rounded">
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline text-sm truncate"
+                          >
+                            {url}
+                          </a>
+                          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </GlassMorphismCard>
@@ -852,14 +930,24 @@ const TaskDetail = () => {
           </div>
           
           <div className="flex flex-col space-y-2">
-            <div className="text-xs text-muted-foreground bg-accent/20 p-2 rounded">
-              <p className="font-medium mb-1">Required S3 bucket permissions:</p>
-              <ul className="list-disc list-inside space-y-1 pl-1">
-                <li>s3:PutObject - To upload files</li>
-                <li>s3:PutObjectAcl - To set file permissions</li>
-                <li>s3:GetObject - To retrieve files</li>
-                <li>CORS configuration must allow uploads from this domain</li>
-              </ul>
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground bg-accent/20 p-2 rounded">
+                <p className="font-medium mb-1">Required S3 bucket permissions:</p>
+                <ul className="list-disc list-inside space-y-1 pl-1">
+                  <li>s3:PutObject - To upload files</li>
+                  <li>s3:PutObjectAcl - To set file permissions</li>
+                  <li>s3:GetObject - To retrieve files</li>
+                  <li>CORS configuration must allow uploads from this domain</li>
+                </ul>
+              </div>
+              
+              <div className="text-xs bg-primary/5 p-2 rounded">
+                <p className="font-medium mb-1">CORS Configuration:</p>
+                <p className="mb-1">Copy this configuration to your S3 bucket CORS settings in the AWS console:</p>
+                <pre className="bg-black/5 dark:bg-white/5 p-2 rounded overflow-auto max-h-32 text-[10px]">
+                  {connectionStatus.details?.corsConfig || ''}
+                </pre>
+              </div>
             </div>
           </div>
           

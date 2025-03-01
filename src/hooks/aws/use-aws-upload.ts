@@ -1,11 +1,11 @@
 
 import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
-import { 
-  uploadToAwsS3, 
-  validateFile, 
+import {
+  validateFile,
   getAwsCredentials,
 } from '@/utils/awsStorage';
+import { uploadWithPresignedUrl } from '@/utils/awsPresignedUpload';
 import { UseAwsStorageOptions } from './types';
 
 /**
@@ -110,12 +110,12 @@ export function useAwsUpload(options: UseAwsStorageOptions = {}) {
       
       toast({
         title: "Starting AWS S3 Upload",
-        description: `Uploading ${file.name} to ${credentials.bucket}...`,
+        description: `Uploading ${file.name} to ${credentials.bucket} using pre-signed URL...`,
         variant: "default",
       });
       
-      // Perform the actual AWS S3 upload
-      const url = await uploadToAwsS3(file, uploadPath);
+      // Perform the actual AWS S3 upload using pre-signed URL approach
+      const url = await uploadWithPresignedUrl(file, uploadPath);
       
       // Clear the progress interval
       clearInterval(progressInterval);
@@ -137,7 +137,7 @@ export function useAwsUpload(options: UseAwsStorageOptions = {}) {
       
       toast({
         title: "Upload successful",
-        description: `File uploaded to AWS S3: ${file.name}`,
+        description: `File uploaded to AWS S3 using pre-signed URL: ${file.name}`,
         variant: "success",
       });
       
@@ -165,8 +165,8 @@ export function useAwsUpload(options: UseAwsStorageOptions = {}) {
       
       toast({
         title: "Upload failed",
-        description: corsError 
-          ? `${errorMessage} This may be due to CORS restrictions. Check your S3 bucket CORS settings.` 
+        description: corsError
+          ? `${errorMessage} This may be due to CORS restrictions. We're using pre-signed URLs to bypass CORS, but your S3 bucket may still need CORS configuration.`
           : errorMessage,
         variant: "destructive",
       });
