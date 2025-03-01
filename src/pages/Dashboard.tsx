@@ -16,8 +16,8 @@ const availableTasks = [
     description: 'Collect images of oil spills in various environments to help train AI models for early detection.',
     category: 'Environmental',
     deadline: '2024-05-15',
-    pointsPerUpload: 25,
-    pointsPerLabel: 10,
+    pointsPerUpload: 1,
+    pointsPerLabel: 1,
     difficulty: 'Medium',
     progress: 35,
     image: 'https://images.unsplash.com/photo-1433086966358-54859d0ed716?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8b2NlYW58ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=800&q=60'
@@ -28,8 +28,8 @@ const availableTasks = [
     description: 'Help build a dataset of flat tires in various conditions for roadside assistance AI.',
     category: 'Automotive',
     deadline: '2024-04-30',
-    pointsPerUpload: 20,
-    pointsPerLabel: 8,
+    pointsPerUpload: 1,
+    pointsPerLabel: 1,
     difficulty: 'Easy',
     progress: 60,
     image: 'https://images.unsplash.com/photo-1485833077593-4278bba3f11f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OXx8cm9hZHxlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&w=800&q=60'
@@ -40,8 +40,8 @@ const availableTasks = [
     description: 'Gather images of wildlife in natural habitats to train AI for population monitoring.',
     category: 'Wildlife',
     deadline: '2024-06-20',
-    pointsPerUpload: 30,
-    pointsPerLabel: 15,
+    pointsPerUpload: 1,
+    pointsPerLabel: 1,
     difficulty: 'Hard',
     progress: 15,
     image: 'https://images.unsplash.com/photo-1487252665478-49b61b47f302?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTB8fHdpbGRsaWZlfGVufDB8fDB8fHww&auto=format&fit=crop&w=800&q=60'

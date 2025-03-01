@@ -15,13 +15,13 @@ export interface UploadRecord {
 
 // Points configuration
 const POINTS_CONFIG = {
-  BASE_POINTS: 1,            // Base points for any upload
-  IMAGE_POINTS: 1,           // Points for image uploads
-  SIZE_MULTIPLIER: 0.05,     // Points per MB
-  BONUS_THRESHOLD: 10,       // MB threshold for bonus points
-  BONUS_POINTS: 2,           // Bonus points for large files
-  DATA_FILE_BONUS: 3,        // Bonus for data files (CSV, JSON, Excel)
-  MAX_POINTS_PER_UPLOAD: 20  // Cap on points per upload
+  BASE_POINTS: 0,            // Base points for any upload
+  IMAGE_POINTS: 1,           // Points for image uploads (1 point per image)
+  SIZE_MULTIPLIER: 0,        // Points per MB (no points for size)
+  BONUS_THRESHOLD: 0,        // MB threshold for bonus points (no bonus)
+  BONUS_POINTS: 0,           // Bonus points for large files (no bonus)
+  DATA_FILE_BONUS: 0,        // Bonus for data files (no bonus)
+  MAX_POINTS_PER_UPLOAD: 1   // Cap on points per upload (1 point max)
 };
 
 /**
@@ -31,32 +31,15 @@ const POINTS_CONFIG = {
  * @returns Number of points to award
  */
 export const calculateUploadPoints = (fileSize: number, fileType: string): number => {
-  // Convert bytes to MB for calculation
-  const fileSizeMB = fileSize / (1024 * 1024);
+  // Simple points system: 1 point per image, 0 points for other file types
   
-  // Start with base points
-  let points = POINTS_CONFIG.BASE_POINTS;
-  
-  // Add points for image uploads
+  // Award points only for image uploads
   if (fileType.includes('image/')) {
-    points += POINTS_CONFIG.IMAGE_POINTS;
+    return POINTS_CONFIG.IMAGE_POINTS;
   }
   
-  // Add points based on file size
-  points += Math.floor(fileSizeMB * POINTS_CONFIG.SIZE_MULTIPLIER);
-  
-  // Add bonus for large files
-  if (fileSizeMB > POINTS_CONFIG.BONUS_THRESHOLD) {
-    points += POINTS_CONFIG.BONUS_POINTS;
-  }
-  
-  // Add bonus for specific file types (e.g., more points for data files)
-  if (fileType.includes('csv') || fileType.includes('json') || fileType.includes('excel')) {
-    points += POINTS_CONFIG.DATA_FILE_BONUS;
-  }
-  
-  // Cap points at maximum
-  return Math.min(points, POINTS_CONFIG.MAX_POINTS_PER_UPLOAD);
+  // No points for non-image files
+  return 0;
 };
 
 /**
@@ -123,6 +106,7 @@ export const trackFileUpload = async (
           title: "Points Earned!",
           description: `You earned ${pointsAwarded} points for uploading ${fileName}`,
           variant: "success",
+          duration: 5000, // Show for 5 seconds to ensure visibility
         });
       }
       
@@ -142,6 +126,7 @@ export const trackFileUpload = async (
         title: "Points Earned!",
         description: `You earned ${pointsAwarded} points for uploading ${fileName}`,
         variant: "success",
+        duration: 5000, // Show for 5 seconds to ensure visibility
       });
     }
     

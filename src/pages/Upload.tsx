@@ -206,8 +206,11 @@ const Upload = () => {
           >
             <UploadIcon className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h2 className="text-2xl font-bold mb-2">Drag and drop files here</h2>
-            <p className="text-muted-foreground mb-6">
+            <p className="text-muted-foreground mb-2">
               Support for images, audio, and video files
+            </p>
+            <p className="text-sm text-primary mb-6">
+              Earn 1 point for each image you upload!
             </p>
             <input
               type="file"
