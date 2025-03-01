@@ -41,13 +41,14 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     message: ''
   });
 
-  // Always enable real storage if forced, even on mount
+  // Always enable real storage by default
   useEffect(() => {
+    // Either force real storage or use the default real storage setting
     if (options.forceReal) {
       setUseRealAwsStorage(true);
       console.log("AWS S3 Storage: Forcing real storage mode");
     } else {
-      // Enable real storage by default
+      // Enable real storage by default anyway
       setUseRealAwsStorage(true);
       console.log("AWS S3 Storage: Using real storage mode by default");
     }
@@ -63,21 +64,47 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     try {
       console.log("Fetching available S3 buckets...");
       
+      // Show loading toast for better UX
+      toast({
+        title: "Checking AWS Connection",
+        description: "Fetching available S3 buckets...",
+        variant: "default",
+      });
+      
       const buckets = await listAwsBuckets();
       console.log("Fetched buckets:", buckets);
       setAvailableBuckets(buckets);
+      
+      if (buckets.length > 0) {
+        toast({
+          title: "AWS Connection Success",
+          description: `Found ${buckets.length} available S3 buckets.`,
+          variant: "success",
+        });
+      }
+      
       return buckets;
     } catch (error) {
       console.error("Failed to fetch available buckets:", error);
       
+      toast({
+        title: "AWS Connection Issue",
+        description: error instanceof Error ? error.message : "Failed to fetch buckets",
+        variant: "destructive",
+      });
+      
       // Check if bucket exists in current credentials
       const credentials = getAwsCredentials();
       if (credentials.bucket) {
-        const bucketExists = await checkBucketExists(credentials.bucket);
-        if (bucketExists) {
-          console.log(`Current bucket ${credentials.bucket} exists`);
-          setAvailableBuckets([credentials.bucket]);
-          return [credentials.bucket];
+        try {
+          const bucketExists = await checkBucketExists(credentials.bucket);
+          if (bucketExists) {
+            console.log(`Current bucket ${credentials.bucket} exists`);
+            setAvailableBuckets([credentials.bucket]);
+            return [credentials.bucket];
+          }
+        } catch (bucketError) {
+          console.error("Error checking current bucket:", bucketError);
         }
       }
       
@@ -99,6 +126,13 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     
     try {
       console.log("Starting AWS S3 connectivity test");
+      
+      // Show toast for better UX
+      toast({
+        title: "Testing AWS Connection",
+        description: "Please wait while we verify your AWS S3 credentials...",
+        variant: "default",
+      });
       
       // Get the current credentials
       const credentials = getAwsCredentials();
@@ -262,6 +296,12 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       const uploadPath = options.path || 'uploads/';
       console.log(`Starting upload of ${file.name} to AWS S3 bucket ${credentials.bucket} with path: ${uploadPath}`);
       
+      toast({
+        title: "Starting AWS S3 Upload",
+        description: `Uploading ${file.name} to ${credentials.bucket}...`,
+        variant: "default",
+      });
+      
       // Perform the actual AWS S3 upload
       const url = await uploadToAwsS3(file, uploadPath);
       
@@ -304,9 +344,18 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
         options.onError(error);
       }
       
+      const errorMessage = error.message || 'Upload failed. Please try again.';
+      
+      // Check for CORS errors in the message
+      const corsError = errorMessage.includes('CORS') || 
+                        errorMessage.includes('fetch') || 
+                        errorMessage.includes('network');
+      
       toast({
         title: "Upload failed",
-        description: error.message || 'Upload failed. Please try again.',
+        description: corsError 
+          ? `${errorMessage} This may be due to CORS restrictions. Check your S3 bucket CORS settings.` 
+          : errorMessage,
         variant: "destructive",
       });
       
@@ -318,7 +367,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
 
   // Get credential status
   const credentials = getAwsCredentials();
-  const hasValidCredentials = Boolean(getAwsCredentials().accessKeyId && getAwsCredentials().secretAccessKey); 
+  const hasValidCredentials = Boolean(credentials.accessKeyId && credentials.secretAccessKey && credentials.bucket); 
   const isUsingCustomCredentials = isUsingCustomAwsCredentials();
   
   // Get storage mode (real or simulated)
@@ -350,6 +399,13 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
         accessKeyId: newCredentials.accessKeyId.substring(0, 5) + "...",
         region: newCredentials.region,
         bucket: newCredentials.bucket
+      });
+      
+      // Show toast for better UX
+      toast({
+        title: "Updating AWS Credentials",
+        description: "Saving your AWS S3 credentials...",
+        variant: "default",
       });
       
       // Save the new credentials

@@ -28,6 +28,10 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
     if (options.forceReal) {
       setUseRealOortStorage(true);
       console.log("OORT Storage: Forcing real storage mode");
+    } else {
+      // Enable real storage by default for consistency with AWS
+      setUseRealOortStorage(true);
+      console.log("OORT Storage: Using real storage mode by default");
     }
     
     // If a path is provided, log it for debugging
@@ -111,6 +115,12 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
       // Log the upload path for debugging
       const uploadPath = options.path || 'uploads/';
       console.log(`Starting upload to OORT with path: ${uploadPath}`);
+      
+      toast({
+        title: "Starting OORT Upload",
+        description: `Uploading ${file.name} to OORT labsmarket bucket...`,
+        variant: "default",
+      });
 
       // Perform the actual upload
       const url = await uploadToOortStorage(file, uploadPath);
