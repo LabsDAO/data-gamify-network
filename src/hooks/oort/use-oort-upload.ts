@@ -1,10 +1,11 @@
 
 import { useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
-import { 
-  uploadToOortStorage, 
-  validateFile, 
-  getOortCredentials
+import {
+  uploadToOortStorage,
+  validateFile,
+  getOortCredentials,
+  UploadResult
 } from '@/utils/oortStorage';
 import { UseOortStorageOptions } from './types';
 
@@ -17,7 +18,11 @@ export function useOortUpload(options: UseOortStorageOptions = {}) {
   const [error, setError] = useState<Error | null>(null);
   const [uploadUrl, setUploadUrl] = useState<string | null>(null);
 
-  const uploadFile = async (file: File) => {
+  const uploadFile = async (
+    file: File,
+    userId?: string,
+    addPointsCallback?: (points: number) => void
+  ): Promise<UploadResult | null> => {
     if (!file) {
       const noFileError = new Error('No file selected');
       setError(noFileError);
@@ -32,7 +37,10 @@ export function useOortUpload(options: UseOortStorageOptions = {}) {
         variant: "destructive",
       });
       
-      return null;
+      return {
+        success: false,
+        error: noFileError.message
+      };
     }
     
     // Log file info for debugging
@@ -56,7 +64,10 @@ export function useOortUpload(options: UseOortStorageOptions = {}) {
         variant: "destructive",
       });
       
-      return null;
+      return {
+        success: false,
+        error: validation.error || 'File validation failed'
+      };
     }
     
     setIsUploading(true);
@@ -85,7 +96,7 @@ export function useOortUpload(options: UseOortStorageOptions = {}) {
       }, 500);
 
       // Log the upload path for debugging
-      const uploadPath = options.path || 'uploads/';
+      const uploadPath = options.path || 'Flat-tires/';
       console.log(`Starting upload to OORT with path: ${uploadPath}`);
       
       toast({
@@ -95,52 +106,86 @@ export function useOortUpload(options: UseOortStorageOptions = {}) {
       });
 
       // Perform the actual upload
-      const url = await uploadToOortStorage(file, uploadPath);
+      const result = await uploadToOortStorage(file, uploadPath, userId, addPointsCallback);
       
       // Clear the progress interval
       clearInterval(progressInterval);
       
-      // Log the successful upload URL
-      console.log(`OORT upload successful to ${url}`);
-      
-      // Set progress to 100% on success
+      // Set progress to 100% regardless of success/failure
       setProgress(100);
       if (options.onProgress) {
         options.onProgress(100);
       }
       
-      setUploadUrl(url);
-      
-      if (options.onSuccess) {
-        options.onSuccess(url);
+      if (result.success) {
+        // Log the successful upload URL
+        console.log(`OORT upload successful to ${result.url}`);
+        
+        // Store the URL
+        if (result.url) {
+          setUploadUrl(result.url);
+          
+          if (options.onSuccess) {
+            options.onSuccess(result.url);
+          }
+        }
+        
+        // Show appropriate toast based on verification status
+        if (result.verified) {
+          toast({
+            title: "Upload successful",
+            description: `File uploaded to OORT Storage and verified: ${file.name}`,
+            variant: "success",
+          });
+        } else {
+          toast({
+            title: "Upload completed",
+            description: `File uploaded to OORT Storage but verification failed. The file may not be immediately accessible: ${file.name}`,
+            variant: "default",
+          });
+        }
+        
+        return result;
+      } else {
+        // Handle upload failure
+        const errorMessage = result.error || 'Unknown error during upload';
+        const error = new Error(errorMessage);
+        setError(error);
+        
+        if (options.onError) {
+          options.onError(error);
+        }
+        
+        toast({
+          title: "Upload failed",
+          description: `Error: ${errorMessage}${result.statusCode ? ` (Status: ${result.statusCode})` : ''}`,
+          variant: "destructive",
+        });
+        
+        console.error("OORT Storage upload error:", errorMessage);
+        return result;
       }
-      
-      toast({
-        title: "Upload successful",
-        description: `File uploaded to OORT Storage: ${file.name}`,
-        variant: "success",
-      });
-      
-      return url;
     } catch (err) {
-      const error = err instanceof Error ? err : new Error('Unknown error during upload');
+      // This should only happen for unexpected errors, as the uploadToOortStorage function
+      // now handles errors internally and returns them as part of the UploadResult
+      const error = err instanceof Error ? err : new Error('Unexpected error during upload process');
       setError(error);
       
       if (options.onError) {
         options.onError(error);
       }
       
-      // Enhanced error toast with more information
-      const errorMessage = error.message || 'Upload failed. Please try again.';
-      
       toast({
-        title: "Upload failed",
-        description: errorMessage,
+        title: "Upload process failed",
+        description: `An unexpected error occurred: ${error.message}`,
         variant: "destructive",
       });
       
-      console.error("OORT Storage upload error:", error);
-      return null;
+      console.error("Unexpected OORT Storage upload error:", error);
+      return {
+        success: false,
+        error: error.message,
+      };
     } finally {
       setIsUploading(false);
     }

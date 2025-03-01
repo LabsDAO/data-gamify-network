@@ -20,7 +20,7 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <PrivyProvider
-    appId="cm7pcunwq006v136f3t2sk6jc"
+    appId={import.meta.env.VITE_PRIVY_APP_ID}
     config={{
       loginMethods: ["email", "wallet"],
       appearance: {
@@ -28,6 +28,8 @@ const App = () => (
         accentColor: "#6366F1",
         logo: "/lovable-uploads/3c0d4a69-03a7-4f9f-b704-73bcc535ddef.png",
       },
+      // Enable wallet connections with minimal configuration
+      walletConnectCloudProjectId: import.meta.env.VITE_WALLET_CONNECT_PROJECT_ID,
     }}
   >
     <QueryClientProvider client={queryClient}>

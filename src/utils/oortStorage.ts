@@ -4,12 +4,33 @@
 type StorageCredentials = {
   accessKey: string;
   secretKey: string;
+  endpoint?: string;
 };
 
-// Default credentials (using the new provided credentials)
+// Get credentials from environment variables if available
+const getEnvCredentials = (): Partial<StorageCredentials> => {
+  const credentials: Partial<StorageCredentials> = {};
+  
+  if (import.meta.env.VITE_OORT_ACCESS_KEY) {
+    credentials.accessKey = import.meta.env.VITE_OORT_ACCESS_KEY;
+  }
+  
+  if (import.meta.env.VITE_OORT_SECRET_KEY) {
+    credentials.secretKey = import.meta.env.VITE_OORT_SECRET_KEY;
+  }
+  
+  if (import.meta.env.VITE_OORT_ENDPOINT) {
+    credentials.endpoint = import.meta.env.VITE_OORT_ENDPOINT;
+  }
+  
+  return credentials;
+};
+
+// Default credentials (fallback if environment variables are not set)
 const DEFAULT_CREDENTIALS: StorageCredentials = {
   accessKey: "3IRFO1K3VC23DVSE81IO",
   secretKey: "qlPAgrnHGujYJzqgRrRE5bsLb40Flk8B9BTRdng8",
+  endpoint: "https://s3-standard.oortech.com",
 };
 
 // File validation rules
@@ -25,11 +46,18 @@ const ALLOWED_FILE_TYPES = [
   'video/mp4', 'video/webm',
   // Audio
   'audio/mpeg', 'audio/wav', 'audio/ogg',
+  // Plain text (for testing)
+  'text/plain',
 ];
 
 // OORT Storage config
-const OORT_ENDPOINT = 'https://s3-standard.oortech.com';
 const OORT_BUCKET = 'labsmarket'; // Set the target bucket to labsmarket
+
+// Get the OORT endpoint from credentials or environment variable
+const getOortEndpoint = (): string => {
+  const credentials = getOortCredentials();
+  return credentials.endpoint || 'https://s3-standard.oortech.com';
+};
 
 /**
  * Validate file before upload
@@ -60,17 +88,33 @@ export const validateFile = (file: File): { valid: boolean; error?: string } => 
 };
 
 /**
- * Get OORT Storage credentials from localStorage or use defaults
+ * Get OORT Storage credentials from environment variables, localStorage, or use defaults
  */
 export const getOortCredentials = (): StorageCredentials => {
-  const storedCredentials = localStorage.getItem('oort_credentials');
-  if (storedCredentials) {
-    try {
-      return JSON.parse(storedCredentials);
-    } catch (e) {
-      console.error("Failed to parse stored OORT credentials", e);
+  // Check if we're in a browser environment with localStorage
+  const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+  
+  // First try to get from localStorage (only in browser)
+  if (isBrowser) {
+    const storedCredentials = localStorage.getItem('oort_credentials');
+    if (storedCredentials) {
+      try {
+        return JSON.parse(storedCredentials);
+      } catch (e) {
+        console.error("Failed to parse stored OORT credentials", e);
+      }
     }
   }
+  
+  // Then try to get from environment variables
+  const envCredentials = getEnvCredentials();
+  
+  // If we have all required credentials from environment variables, use them
+  if (envCredentials.accessKey && envCredentials.secretKey) {
+    return envCredentials as StorageCredentials;
+  }
+  
+  // Otherwise, use default credentials
   return DEFAULT_CREDENTIALS;
 };
 
@@ -78,152 +122,99 @@ export const getOortCredentials = (): StorageCredentials => {
  * Save OORT Storage credentials to localStorage
  */
 export const saveOortCredentials = (credentials: StorageCredentials): void => {
-  localStorage.setItem('oort_credentials', JSON.stringify(credentials));
+  // Check if we're in a browser environment with localStorage
+  const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+  
+  if (isBrowser) {
+    localStorage.setItem('oort_credentials', JSON.stringify(credentials));
+  } else {
+    console.warn('Cannot save OORT credentials: localStorage is not available in this environment');
+  }
 };
 
 /**
  * Check if custom credentials are being used
  */
 export const isUsingCustomCredentials = (): boolean => {
-  return localStorage.getItem('oort_credentials') !== null;
+  // Check if we're in a browser environment with localStorage
+  const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+  
+  // Check if credentials are stored in localStorage (only in browser)
+  let hasStoredCredentials = false;
+  if (isBrowser) {
+    hasStoredCredentials = localStorage.getItem('oort_credentials') !== null;
+    
+    if (hasStoredCredentials) {
+      return true;
+    }
+  }
+  
+  // Check if environment variables are being used
+  const envCredentials = getEnvCredentials();
+  const hasEnvCredentials = !!(
+    envCredentials.accessKey &&
+    envCredentials.secretKey
+  );
+  
+  return hasEnvCredentials;
 };
 
 /**
  * Upload a file to OORT Storage
- * This implementation uses the OORT Storage REST API with proper error handling
+ * This implementation uses AWS v4 signature authentication as required by OORT Storage
  */
-export const uploadToOortStorage = async (
-  file: File, 
-  path: string = 'uploads/'
-): Promise<string> => {
-  // Validate file first
-  const validation = validateFile(file);
-  if (!validation.valid) {
-    throw new Error(validation.error);
-  }
-  
-  const credentials = getOortCredentials();
-  
-  // Construct the full path including the filename with timestamp
-  const timestamp = Date.now();
-  const fileName = `${timestamp}-${file.name}`;
-  const fullPath = `${path}${fileName}`.replace(/\/\//g, '/');
-  
-  console.log(`Starting OORT upload: ${file.name}, Size: ${file.size} bytes, Path: ${fullPath}`);
-  
-  // Enable fallback only for explicit development mode, not for production or when testing actual uploads
-  const useFallbackStorage = process.env.NODE_ENV === 'development' && localStorage.getItem('use_real_oort') !== 'true';
-  
-  if (useFallbackStorage) {
-    // Store in localStorage as base64 for demo purposes
-    try {
-      return new Promise((resolve) => {
-        // Generate a realistic-looking URL for the demo without actually uploading
-        const demoUrl = `${OORT_ENDPOINT}/${OORT_BUCKET}/${fullPath}`;
-        
-        // Simulate network delay
-        setTimeout(() => {
-          console.log('OORT Storage mock upload successful');
-          resolve(demoUrl);
-        }, 1500);
-      });
-    } catch (error) {
-      console.error('Mock storage error:', error);
-      throw error;
-    }
-  }
+export type UploadResult = {
+  success: boolean;
+  url?: string;
+  error?: string;
+  statusCode?: number;
+  verified?: boolean;
+};
 
-  try {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      
-      // Set up the endpoint with the specific bucket
-      const uploadUrl = `${OORT_ENDPOINT}/${OORT_BUCKET}/${fullPath}`;
-      
-      console.log(`Uploading to: ${uploadUrl}`);
-      
-      xhr.open('PUT', uploadUrl, true);
-      
-      // Set proper content type based on file type
-      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-      
-      // IMPORTANT: For OORT Storage, use the Token header format
-      // This is the key change based on OORT's specific requirements
-      const token = btoa(`${credentials.accessKey}:${credentials.secretKey}`); // Base64 encode the credentials
-      xhr.setRequestHeader('Token', token);
-      
-      // Add OORT-specific headers as backup
-      xhr.setRequestHeader('X-OORT-ACCESS-KEY', credentials.accessKey);
-      xhr.setRequestHeader('X-OORT-SECRET-KEY', credentials.secretKey);
-      
-      // Handle completion
-      xhr.onload = function() {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          // S3-compatible services typically return empty response for successful PUT
-          const fileUrl = `${OORT_ENDPOINT}/${OORT_BUCKET}/${fullPath}`;
-          console.log('OORT Storage upload successful');
-          resolve(fileUrl);
-        } else {
-          let errorMessage = `OORT Storage upload failed: ${xhr.status}`;
-          try {
-            const errorResponse = JSON.parse(xhr.responseText);
-            errorMessage += ` - ${errorResponse.message || errorResponse.error || 'Unknown error'}`;
-          } catch (e) {
-            // If we can't parse the error response, use the status text
-            errorMessage += ` - ${xhr.statusText || 'Unknown error'}`;
-          }
-          console.error(errorMessage);
-          console.error('Response:', xhr.responseText);
-          reject(new Error(errorMessage));
-        }
-      };
-      
-      // Handle network errors
-      xhr.onerror = function() {
-        const error = new Error('Network error occurred during OORT Storage upload');
-        console.error(error);
-        reject(error);
-      };
-      
-      // Handle timeouts
-      xhr.ontimeout = function() {
-        const error = new Error('OORT Storage upload timed out');
-        console.error(error);
-        reject(error);
-      };
-      
-      // Track upload progress
-      xhr.upload.onprogress = function(event) {
-        if (event.lengthComputable) {
-          const percentComplete = (event.loaded / event.total) * 100;
-          console.log(`Upload progress: ${percentComplete.toFixed(2)}%`);
-        }
-      };
-      
-      // Send the file directly
-      xhr.send(file);
-    });
-  } catch (error) {
-    console.error('OORT Storage upload error:', error);
-    throw error;
-  }
+export const uploadToOortStorage = async (
+  file: File,
+  path: string = 'Flat-tires/',
+  userId?: string,
+  addPointsCallback?: (points: number) => void
+): Promise<UploadResult> => {
+  // Import the AWS v4 signature implementation
+  const { uploadToOortStorage: uploadWithAwsAuth } = await import('./oortStorageWithAwsAuth');
+  
+  // Use the AWS v4 signature implementation
+  return uploadWithAwsAuth(file, path, userId, addPointsCallback);
 };
 
 /**
  * Reset to default credentials
  */
 export const resetToDefaultCredentials = (): void => {
-  localStorage.removeItem('oort_credentials');
+  // Check if we're in a browser environment with localStorage
+  const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+  
+  if (isBrowser) {
+    localStorage.removeItem('oort_credentials');
+  } else {
+    console.log('Running in Node.js environment - cannot reset credentials in localStorage');
+  }
 };
 
 /**
  * Toggle between real and simulated uploads
  */
 export const setUseRealOortStorage = (useReal: boolean): void => {
-  if (useReal) {
-    localStorage.setItem('use_real_oort', 'true');
+  // Check if we're in a browser environment with localStorage
+  const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+  
+  if (isBrowser) {
+    if (useReal) {
+      localStorage.setItem('use_real_oort', 'true');
+    } else {
+      localStorage.removeItem('use_real_oort');
+    }
   } else {
-    localStorage.removeItem('use_real_oort');
+    console.log(`Running in Node.js environment - ${useReal ? 'using' : 'not using'} real OORT storage`);
+    // In Node.js, we'll always use real storage for tests
+    // No need to store this preference since localStorage isn't available
   }
 };
 
@@ -231,5 +222,28 @@ export const setUseRealOortStorage = (useReal: boolean): void => {
  * Check if real OORT Storage is being used
  */
 export const isUsingRealOortStorage = (): boolean => {
-  return localStorage.getItem('use_real_oort') === 'true';
+  // Check if we're in a browser environment with localStorage
+  const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+  
+  if (isBrowser) {
+    return localStorage.getItem('use_real_oort') === 'true';
+  }
+  
+  // In Node.js environment, always return true for tests
+  return true;
+};
+
+/**
+ * Verify if a file is accessible via HTTP request
+ * @param url The URL of the file to verify
+ * @returns A promise that resolves to true if the file is accessible, false otherwise
+ */
+const verifyFileAccessibility = async (url: string): Promise<boolean> => {
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    return response.ok;
+  } catch (error) {
+    console.error('Error verifying file accessibility:', error);
+    return false;
+  }
 };

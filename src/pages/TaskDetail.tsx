@@ -13,6 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useOortStorage } from '@/hooks/use-oort-storage';
+import { UploadResult } from '@/utils/oortStorage';
 import { useAwsStorage } from '@/hooks/use-aws-storage';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { getAwsCredentials, saveAwsCredentials } from '@/utils/awsStorage';
@@ -70,6 +71,7 @@ const TaskDetail = () => {
   const [showAuthReminder, setShowAuthReminder] = useState(false);
   const [storageOption, setStorageOption] = useState<string>("oort");
   const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
+  const [verificationStatus, setVerificationStatus] = useState<{[url: string]: boolean}>({});
   const [showConnectionTest, setShowConnectionTest] = useState(false);
   const [showCredentialsDialog, setShowCredentialsDialog] = useState(false);
   const [awsCredentials, setAwsCredentials] = useState(() => getAwsCredentials());
@@ -228,6 +230,7 @@ const TaskDetail = () => {
     setUploading(true);
     setUploadProgress(0);
     setUploadedUrls([]);
+    setVerificationStatus({});
     
     try {
       const successfulUploads: string[] = [];
@@ -260,7 +263,29 @@ const TaskDetail = () => {
           continue;
         } else {
           console.log(`Starting OORT upload for ${file.name} to path ${uploadPath}`);
-          uploadedUrl = await uploadToOort(file);
+          const result: UploadResult = await uploadToOort(file);
+          
+          if (result.success && result.url) {
+            uploadedUrl = result.url;
+            
+            // Store verification status
+            if (result.verified !== undefined) {
+              setVerificationStatus(prev => ({
+                ...prev,
+                [result.url!]: !!result.verified
+              }));
+            }
+            
+            // Log verification status
+            if (result.verified === false) {
+              console.log(`File uploaded but verification failed: ${result.url}`);
+            } else if (result.verified === true) {
+              console.log(`File uploaded and verified successfully: ${result.url}`);
+            }
+          } else {
+            console.error(`Upload failed: ${result.error || 'Unknown error'}`);
+            throw new Error(result.error || `Upload failed with status code: ${result.statusCode || 'unknown'}`);
+          }
         }
         
         if (uploadedUrl) {
@@ -688,15 +713,30 @@ const TaskDetail = () => {
             
             {uploading && (
               <div className="mb-6">
-                <p className="text-sm font-medium mb-2">
-                  Uploading to {storageOption === "aws" ? "AWS S3" : "OORT"}... {uploadProgress.toFixed(0)}%
-                </p>
+                <div className="flex justify-between items-center mb-2">
+                  <p className="text-sm font-medium">
+                    Uploading to {storageOption === "aws" ? "AWS S3" : "OORT"}... {uploadProgress.toFixed(0)}%
+                  </p>
+                  {uploadProgress > 95 && storageOption === "oort" && (
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-amber-500 mr-2 animate-pulse"></div>
+                      <span className="text-xs text-amber-600">Verifying upload...</span>
+                    </div>
+                  )}
+                </div>
                 <Progress value={uploadProgress} className="h-2" />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {storageOption === "aws"
-                    ? "Using pre-signed URL approach to bypass CORS restrictions"
-                    : "Using direct upload to OORT storage"}
-                </p>
+                <div className="flex justify-between mt-1">
+                  <p className="text-xs text-muted-foreground">
+                    {storageOption === "aws"
+                      ? "Using pre-signed URL approach to bypass CORS restrictions"
+                      : "Using direct upload to OORT storage in Flat-tires folder"}
+                  </p>
+                  {uploadProgress > 0 && uploadProgress < 100 && (
+                    <p className="text-xs text-muted-foreground">
+                      {uploadProgress < 90 ? "Uploading..." : "Finalizing..."}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
             
@@ -746,6 +786,42 @@ const TaskDetail = () => {
                     <p className="text-sm text-green-600 dark:text-green-400 mb-2">
                       {uploadedUrls.length} {uploadedUrls.length === 1 ? 'file' : 'files'} uploaded successfully to {storageOption === "aws" ? "AWS S3" : "OORT labsmarket bucket"}.
                     </p>
+                    
+                    {/* Display verification status for OORT uploads */}
+                    {storageOption === "oort" && (
+                      <>
+                        <div className="flex items-center gap-2 mt-1 mb-1">
+                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            Files uploaded to the Flat-tires folder in OORT labsmarket bucket
+                          </p>
+                        </div>
+                        
+                        {/* Show verification summary */}
+                        {Object.keys(verificationStatus).length > 0 && (
+                          <div className="mt-1 text-xs border-t border-green-200 dark:border-green-800 pt-1">
+                            <p className="text-green-600 dark:text-green-400 font-medium">Verification Status:</p>
+                            <div className="flex gap-4 mt-1">
+                              <div className="flex items-center">
+                                <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
+                                <span>
+                                  {Object.values(verificationStatus).filter(Boolean).length} verified
+                                </span>
+                              </div>
+                              {Object.values(verificationStatus).some(v => v === false) && (
+                                <div className="flex items-center">
+                                  <div className="w-2 h-2 rounded-full bg-amber-500 mr-1"></div>
+                                  <span>
+                                    {Object.values(verificationStatus).filter(v => v === false).length} unverified
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
                     {storageOption === "aws" && (
                       <p className="text-xs text-green-500 dark:text-green-500">
                         Used pre-signed URL approach to bypass CORS restrictions.
@@ -760,19 +836,44 @@ const TaskDetail = () => {
                       Uploaded Files {storageOption === "aws" ? "(AWS S3)" : "(OORT labsmarket bucket)"}
                     </h3>
                     <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-input rounded-md">
-                      {uploadedUrls.map((url, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-background/50 rounded">
-                          <a
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline text-sm truncate"
-                          >
-                            {url}
-                          </a>
-                          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                        </div>
-                      ))}
+                      {uploadedUrls.map((url, index) => {
+                        // Get verification status from state
+                        const isVerified = verificationStatus[url];
+                        const hasVerificationInfo = url in verificationStatus;
+                        
+                        return (
+                          <div key={index} className="flex items-center justify-between p-2 bg-background/50 rounded">
+                            <div className="flex-1 min-w-0">
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline text-sm truncate block"
+                              >
+                                {url}
+                              </a>
+                              {storageOption === "oort" && (
+                                <div className="flex items-center mt-1">
+                                  {hasVerificationInfo ? (
+                                    <>
+                                      <div className={`w-2 h-2 rounded-full ${isVerified ? 'bg-green-500' : 'bg-amber-500'} mr-2`}></div>
+                                      <span className={`text-xs ${isVerified ? 'text-green-600' : 'text-amber-600'}`}>
+                                        {isVerified ? 'Verified and accessible' : 'Uploaded but verification failed'}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                                      <span className="text-xs text-green-600">Upload successful</span>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 ml-2" />
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 )}

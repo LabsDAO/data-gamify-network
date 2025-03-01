@@ -2,7 +2,7 @@
 import { UseOortStorageOptions } from './types';
 import { useOortUpload } from './use-oort-upload';
 import { useOortStorageMode } from './use-oort-storage-mode';
-import { validateFile } from '@/utils/oortStorage';
+import { validateFile, UploadResult } from '@/utils/oortStorage';
 
 /**
  * Main OORT Storage hook that combines upload and mode functionality

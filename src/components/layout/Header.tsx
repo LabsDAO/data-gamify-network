@@ -58,7 +58,10 @@ const Header = () => {
       await logout();
       navigate('/');
     } else {
+      // Open Privy login modal
       privyLogin();
+      
+      console.log("Opening Privy login modal with wallet options");
     }
   };
 
