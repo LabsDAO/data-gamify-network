@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Upload, Tag, Clock, Award, CheckCircle, XCircle, AlertCircle, Camera, Wifi, Settings, Info } from 'lucide-react';
@@ -78,6 +77,8 @@ const TaskDetail = () => {
   const task = id ? tasksMockData[id as keyof typeof tasksMockData] : null;
   
   const uploadPath = id ? `${id}/` : 'uploads/';
+  
+  console.log(`TaskDetail: Setting upload path for task ${id} to "${uploadPath}"`);
   
   const { 
     uploadFile: uploadToOort, 
@@ -250,10 +251,16 @@ const TaskDetail = () => {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         
+        const uploadPathMessage = storageOption === "aws" 
+          ? `to AWS S3 (${uploadPath})` 
+          : `to OORT labsmarket bucket (${uploadPath})`;
+        
         toast({
-          title: `Uploading file ${i + 1} of ${files.length}${storageOption === "oort" ? " to OORT labsmarket bucket" : " to AWS S3"}`,
+          title: `Uploading file ${i + 1} of ${files.length} ${uploadPathMessage}`,
           description: file.name,
         });
+        
+        console.log(`Uploading file ${file.name} with path: ${uploadPath}`);
         
         let uploadedUrl;
         
@@ -271,6 +278,7 @@ const TaskDetail = () => {
         }
         
         if (uploadedUrl) {
+          console.log(`Upload success, URL: ${uploadedUrl}`);
           successfulUploads.push(uploadedUrl);
         }
       }

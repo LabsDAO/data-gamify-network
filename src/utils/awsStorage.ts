@@ -118,7 +118,6 @@ const createS3Client = (credentials: AWSCredentials) => {
 
 /**
  * Get a list of all available buckets for the current credentials
- * This can be used to verify bucket existence and help users select the correct bucket
  */
 export const listAwsBuckets = async (): Promise<string[]> => {
   const credentials = getAwsCredentials();
@@ -253,7 +252,7 @@ export const testAwsConnectivity = async (): Promise<{
 export const getBucketEndpointUrl = (bucket: string, region: string): string => {
   // Handle special case for us-east-1
   if (region === 'us-east-1') {
-    return `https://${bucket}.s3.amazonaws.com`;
+    return `https://${bucket}.s3.${region}.amazonaws.com`;
   }
   // Standard format for all other regions
   return `https://${bucket}.s3.${region}.amazonaws.com`;
@@ -293,11 +292,14 @@ export const uploadToAwsS3 = async (
     credentials.region = 'us-east-1'; // Default to us-east-1 if not specified
   }
   
+  // Ensure path ends with a slash
+  const normalizedPath = path.endsWith('/') ? path : `${path}/`;
+  
   // Construct the full path including the filename with timestamp and uuid
   const timestamp = Date.now();
   const uuid = uuidv4().substring(0, 8);
   const fileName = `${timestamp}-${uuid}-${file.name}`;
-  const fullPath = `${path}${fileName}`.replace(/\/\//g, '/');
+  const fullPath = `${normalizedPath}${fileName}`.replace(/\/\//g, '/');
   
   return new Promise((resolve, reject) => {
     try {
