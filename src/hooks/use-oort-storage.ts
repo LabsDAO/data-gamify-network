@@ -143,7 +143,7 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
       console.error("OORT Storage upload error:", error);
       return null;
     } finally {
-      setUploading(false);
+      setIsUploading(false); // Fixed: changed setUploading to setIsUploading
     }
   };
 
