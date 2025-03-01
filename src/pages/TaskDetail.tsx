@@ -12,6 +12,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useOortStorage } from '@/hooks/use-oort-storage';
+import { useAwsStorage } from '@/hooks/use-aws-storage';
 
 const tasksMockData = {
   'oil-spills': {
@@ -75,13 +76,30 @@ const TaskDetail = () => {
     uploadFile: uploadToOort, 
     isUploading: isOortUploading,
     progress: oortProgress,
-    isUsingRealStorage
+    isUsingRealStorage: isUsingRealOort
   } = useOortStorage({
     onProgress: (progress) => {
-      setUploadProgress(progress);
+      if (storageOption === "oort") {
+        setUploadProgress(progress);
+      }
     },
     path: uploadPath,
     forceReal: true
+  });
+  
+  const {
+    uploadFile: uploadToAws,
+    isUploading: isAwsUploading,
+    progress: awsProgress,
+    hasValidCredentials: hasAwsCredentials,
+    isUsingRealStorage: isUsingRealAws
+  } = useAwsStorage({
+    onProgress: (progress) => {
+      if (storageOption === "aws") {
+        setUploadProgress(progress);
+      }
+    },
+    path: uploadPath
   });
   
   useEffect(() => {
@@ -157,6 +175,15 @@ const TaskDetail = () => {
       return;
     }
     
+    if (storageOption === "aws" && !hasAwsCredentials) {
+      toast({
+        title: "AWS S3 not configured",
+        description: "Please configure your AWS S3 credentials before uploading",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setUploading(true);
     setUploadProgress(0);
     setUploadedUrls([]);
@@ -168,13 +195,24 @@ const TaskDetail = () => {
         const file = files[i];
         
         toast({
-          title: `Uploading file ${i + 1} of ${files.length} to OORT labsmarket bucket`,
+          title: `Uploading file ${i + 1} of ${files.length}${storageOption === "oort" ? " to OORT labsmarket bucket" : " to AWS S3"}`,
           description: file.name,
         });
         
         let uploadedUrl;
         
-        uploadedUrl = await uploadToOort(file);
+        if (storageOption === "aws") {
+          uploadedUrl = await uploadToAws(file);
+        } else if (storageOption === "azure") {
+          toast({
+            title: "Azure Storage",
+            description: "Azure Blob Storage is not yet implemented",
+            variant: "destructive"
+          });
+          continue;
+        } else {
+          uploadedUrl = await uploadToOort(file);
+        }
         
         if (uploadedUrl) {
           successfulUploads.push(uploadedUrl);
@@ -192,7 +230,7 @@ const TaskDetail = () => {
         
         toast({
           title: "Upload successful!",
-          description: `You've earned ${totalPoints} points for your contribution! Files stored in OORT labsmarket bucket.`,
+          description: `You've earned ${totalPoints} points for your contribution!${storageOption === "oort" ? " Files stored in OORT labsmarket bucket." : " Files stored in AWS S3."}`,
           variant: "success"
         });
         
@@ -287,18 +325,18 @@ const TaskDetail = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <GlassMorphismCard className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Upload Images to OORT Cloud (labsmarket bucket)</h2>
+            <h2 className="text-xl font-semibold mb-4">Upload Data</h2>
             
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 mb-6 text-center">
               <Upload className="w-10 h-10 mx-auto mb-4 text-muted-foreground" />
-              <p className="mb-4">Drag and drop images here or use the options below</p>
+              <p className="mb-4">Drag and drop files here or use the options below</p>
               
               <div className="flex flex-wrap gap-3 justify-center">
                 <input
                   type="file"
                   id="file-upload"
                   multiple
-                  accept="image/*"
+                  accept="image/*,audio/*,video/*,application/pdf,text/plain,application/json"
                   className="hidden"
                   onChange={handleFileChange}
                   disabled={uploading}
@@ -334,7 +372,7 @@ const TaskDetail = () => {
               </div>
               
               <p className="text-sm text-muted-foreground mt-4">
-                Supported formats: JPG, PNG (max 50MB per file)
+                Supported formats: Images, Audio, Video, Documents (max 100MB per file)
               </p>
             </div>
             
@@ -398,12 +436,14 @@ const TaskDetail = () => {
                   <Label htmlFor="oort" className="cursor-pointer">OORT Cloud (Default)</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="aws" id="aws" />
-                  <Label htmlFor="aws" className="cursor-pointer">AWS S3</Label>
+                  <RadioGroupItem value="aws" id="aws" disabled={!hasAwsCredentials} />
+                  <Label htmlFor="aws" className={`cursor-pointer ${!hasAwsCredentials ? 'text-muted-foreground' : ''}`}>
+                    AWS S3 {!hasAwsCredentials && "(Credentials required)"}
+                  </Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="azure" id="azure" />
-                  <Label htmlFor="azure" className="cursor-pointer">Azure Blob Storage</Label>
+                  <RadioGroupItem value="azure" id="azure" disabled={true} />
+                  <Label htmlFor="azure" className="cursor-pointer text-muted-foreground">Azure Blob Storage (Coming soon)</Label>
                 </div>
               </RadioGroup>
             </div>
@@ -417,7 +457,7 @@ const TaskDetail = () => {
             
             <button
               onClick={handleUpload}
-              disabled={files.length === 0 || uploading}
+              disabled={files.length === 0 || uploading || (storageOption === "aws" && !hasAwsCredentials)}
               className="w-full px-4 py-2 bg-primary text-white rounded-md disabled:opacity-50"
             >
               {uploading ? 'Uploading...' : 'Upload Files'}
@@ -425,7 +465,9 @@ const TaskDetail = () => {
             
             {uploadedUrls.length > 0 && (
               <div className="mt-6">
-                <h3 className="font-semibold mb-2">Uploaded Files (OORT labsmarket bucket)</h3>
+                <h3 className="font-semibold mb-2">
+                  Uploaded Files {storageOption === "aws" ? "(AWS S3)" : "(OORT labsmarket bucket)"}
+                </h3>
                 <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-input rounded-md">
                   {uploadedUrls.map((url, index) => (
                     <div key={index} className="flex items-center justify-between p-2 bg-background/50 rounded">
