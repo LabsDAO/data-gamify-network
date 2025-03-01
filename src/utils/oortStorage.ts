@@ -1,3 +1,4 @@
+
 // OORT Storage integration utility
 
 type StorageCredentials = {
@@ -5,10 +6,10 @@ type StorageCredentials = {
   secretKey: string;
 };
 
-// Default credentials (should be used only if user doesn't provide their own)
+// Default credentials (using the new provided credentials)
 const DEFAULT_CREDENTIALS: StorageCredentials = {
-  accessKey: "1YAWCOB9IEL5O5K13F5P",
-  secretKey: "Od4PGAW31DORFBy9RtujPbzdRsXrxJbI22hCrGjp",
+  accessKey: "3IRFO1K3VC23DVSE81IO",
+  secretKey: "qlPAgrnHGujYJzqgRrRE5bsLb40Flk8B9BTRdng8",
 };
 
 // File validation rules
@@ -146,16 +147,14 @@ export const uploadToOortStorage = async (
       // Set proper content type based on file type
       xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
       
-      // Setup proper OORT authentication headers
-      // Add custom OORT headers with the access and secret keys directly
+      // IMPORTANT: For OORT Storage, use the Token header format
+      // This is the key change based on OORT's specific requirements
+      const token = btoa(`${credentials.accessKey}:${credentials.secretKey}`); // Base64 encode the credentials
+      xhr.setRequestHeader('Token', token);
+      
+      // Add OORT-specific headers as backup
       xhr.setRequestHeader('X-OORT-ACCESS-KEY', credentials.accessKey);
       xhr.setRequestHeader('X-OORT-SECRET-KEY', credentials.secretKey);
-      
-      // Also try the standard S3 authentication approach (tokens in headers)
-      xhr.setRequestHeader('Authorization', `Bearer ${credentials.accessKey}:${credentials.secretKey}`);
-      
-      // Try also with different token format
-      xhr.setRequestHeader('x-amz-token', `${credentials.accessKey}:${credentials.secretKey}`);
       
       // Handle completion
       xhr.onload = function() {

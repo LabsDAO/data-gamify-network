@@ -30,6 +30,11 @@ const OortCredentialsForm = () => {
       const credentials = getOortCredentials();
       setAccessKey(credentials.accessKey);
       setSecretKey(credentials.secretKey);
+    } else {
+      // Display default credentials
+      const defaultCreds = getOortCredentials();
+      setAccessKey(defaultCreds.accessKey);
+      setSecretKey(defaultCreds.secretKey);
     }
     
     // Check storage mode
@@ -59,8 +64,9 @@ const OortCredentialsForm = () => {
 
   const handleReset = () => {
     resetToDefaultCredentials();
-    setAccessKey('');
-    setSecretKey('');
+    const defaultCreds = getOortCredentials();
+    setAccessKey(defaultCreds.accessKey);
+    setSecretKey(defaultCreds.secretKey);
     setIsCustom(false);
     
     toast({
@@ -88,7 +94,7 @@ const OortCredentialsForm = () => {
         <CardDescription>
           {isCustom 
             ? "You're using custom OORT Storage credentials." 
-            : "You're using default OORT Storage credentials. Configure your own credentials below."}
+            : "You're using default OORT Storage credentials."}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -145,7 +151,7 @@ const OortCredentialsForm = () => {
         Your credentials are stored locally in your browser and are never sent to our servers.
         {useRealStorage && !isCustom && (
           <div className="mt-2 text-amber-500">
-            Warning: Using real storage with default credentials. For production use, please set your own credentials.
+            Using real storage with default credentials.
           </div>
         )}
       </CardFooter>

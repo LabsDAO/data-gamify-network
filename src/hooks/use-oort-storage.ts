@@ -143,13 +143,13 @@ export function useOortStorage(options: UseOortStorageOptions = {}) {
       console.error("OORT Storage upload error:", error);
       return null;
     } finally {
-      setIsUploading(false);
+      setUploading(false);
     }
   };
 
   // Get credential status
   const credentials = getOortCredentials();
-  const isUsingDefaultCredentials = credentials.accessKey === "1YAWCOB9IEL5O5K13F5P";
+  const isUsingDefaultCredentials = credentials.accessKey === "3IRFO1K3VC23DVSE81IO";
   
   // Get storage mode (real or simulated)
   const isUsingRealStorage = isUsingRealOortStorage();
