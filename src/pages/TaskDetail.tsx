@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Upload, Tag, Clock, Award, CheckCircle, XCircle, AlertCircle, Camera, Wifi } from 'lucide-react';
+import { Upload, Tag, Clock, Award, CheckCircle, XCircle, AlertCircle, Camera, Wifi, Settings, Info } from 'lucide-react';
 import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
@@ -11,8 +11,11 @@ import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useOortStorage } from '@/hooks/use-oort-storage';
 import { useAwsStorage } from '@/hooks/use-aws-storage';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { getAwsCredentials, saveAwsCredentials } from '@/utils/awsStorage';
 
 const tasksMockData = {
   'oil-spills': {
@@ -68,6 +71,8 @@ const TaskDetail = () => {
   const [storageOption, setStorageOption] = useState<string>("oort");
   const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
   const [showConnectionTest, setShowConnectionTest] = useState(false);
+  const [showCredentialsDialog, setShowCredentialsDialog] = useState(false);
+  const [awsCredentials, setAwsCredentials] = useState(() => getAwsCredentials());
   
   const task = id ? tasksMockData[id as keyof typeof tasksMockData] : null;
   
@@ -96,7 +101,10 @@ const TaskDetail = () => {
     isUsingRealStorage: isUsingRealAws,
     testConnection,
     isTestingConnection,
-    connectionStatus
+    connectionStatus,
+    availableBuckets,
+    fetchAvailableBuckets,
+    updateCredentials
   } = useAwsStorage({
     onProgress: (progress) => {
       if (storageOption === "aws") {
@@ -121,6 +129,16 @@ const TaskDetail = () => {
       previewUrls.forEach(url => URL.revokeObjectURL(url));
     };
   }, [previewUrls]);
+
+  useEffect(() => {
+    if (storageOption === "aws") {
+      setAwsCredentials(getAwsCredentials());
+      
+      if (!connectionStatus.tested) {
+        testConnection().catch(console.error);
+      }
+    }
+  }, [storageOption, connectionStatus.tested]);
   
   if (!task) {
     return (
@@ -165,6 +183,28 @@ const TaskDetail = () => {
       await testConnection();
     }
   };
+
+  const handleUpdateAwsCredentials = async () => {
+    try {
+      const result = await updateCredentials(awsCredentials);
+      
+      if (result.success) {
+        setShowCredentialsDialog(false);
+        toast({
+          title: "AWS Credentials Updated",
+          description: "Your AWS S3 credentials have been updated and the connection is working.",
+          variant: "success"
+        });
+      }
+    } catch (error) {
+      console.error("Failed to update AWS credentials:", error);
+      toast({
+        title: "Failed to Update Credentials",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+    }
+  };
   
   const handleUpload = async () => {
     if (!authenticated && !user) {
@@ -192,6 +232,7 @@ const TaskDetail = () => {
         description: "Please configure your AWS S3 credentials before uploading",
         variant: "destructive"
       });
+      setShowCredentialsDialog(true);
       return;
     }
     
@@ -468,9 +509,38 @@ const TaskDetail = () => {
                   <Label htmlFor="oort" className="cursor-pointer">OORT Cloud (Default)</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="aws" id="aws" disabled={!hasAwsCredentials} />
-                  <Label htmlFor="aws" className={`cursor-pointer ${!hasAwsCredentials ? 'text-muted-foreground' : ''}`}>
-                    AWS S3 {!hasAwsCredentials && "(Credentials required)"}
+                  <RadioGroupItem value="aws" id="aws" />
+                  <Label htmlFor="aws" className="cursor-pointer">
+                    AWS S3
+                    {hasAwsCredentials ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-2 h-6 px-2 text-xs"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowCredentialsDialog(true);
+                        }}
+                      >
+                        <Settings className="w-3 h-3 mr-1" />
+                        Configure
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="ml-2 h-6 px-2 text-xs"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowCredentialsDialog(true);
+                        }}
+                      >
+                        <Settings className="w-3 h-3 mr-1" />
+                        Set Credentials
+                      </Button>
+                    )}
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -482,10 +552,21 @@ const TaskDetail = () => {
             
             {showConnectionTest && storageOption === "aws" && (
               <div className="mb-6 p-4 border border-input rounded-md bg-accent/20">
-                <h3 className="font-semibold mb-2 flex items-center gap-2">
-                  <Wifi className="w-4 h-4" />
-                  AWS S3 Connection Status
-                </h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Wifi className="w-4 h-4" />
+                    AWS S3 Connection Status
+                  </h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setShowCredentialsDialog(true)}
+                  >
+                    <Settings className="w-3 h-3 mr-1" />
+                    Configure S3
+                  </Button>
+                </div>
                 
                 {isTestingConnection ? (
                   <div className="space-y-2">
@@ -550,10 +631,15 @@ const TaskDetail = () => {
                           <div className="mt-2 text-sm text-muted-foreground">
                             <p className="font-medium">Troubleshooting tips:</p>
                             <ul className="list-disc list-inside text-xs mt-1 space-y-1">
-                              <li>Verify your AWS credentials are correct</li>
-                              <li>Check if your bucket exists and is accessible</li>
+                              <li>Verify your AWS access key and secret key are correct</li>
+                              <li>Make sure your bucket name is correct and exists in your AWS account</li>
                               <li>Ensure your IAM user has s3:PutObject and s3:PutObjectAcl permissions</li>
                               <li>Add CORS configuration to your S3 bucket to allow uploads from this domain</li>
+                              {availableBuckets && availableBuckets.length > 0 && (
+                                <li className="text-primary">
+                                  Your account has access to these buckets: {availableBuckets.join(", ")}
+                                </li>
+                              )}
                             </ul>
                           </div>
                         )}
@@ -586,7 +672,7 @@ const TaskDetail = () => {
             
             <button
               onClick={handleUpload}
-              disabled={files.length === 0 || uploading || (storageOption === "aws" && !hasAwsCredentials)}
+              disabled={files.length === 0 || uploading}
               className="w-full px-4 py-2 bg-primary text-white rounded-md disabled:opacity-50"
             >
               {uploading ? 'Uploading...' : 'Upload Files'}
@@ -676,8 +762,123 @@ const TaskDetail = () => {
           </GlassMorphismCard>
         </div>
       </div>
-    </div>
-  );
-};
 
-export default TaskDetail;
+      <Dialog open={showCredentialsDialog} onOpenChange={setShowCredentialsDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>AWS S3 Credentials</DialogTitle>
+            <DialogDescription>
+              Enter your AWS credentials to connect to S3. Make sure your IAM user has appropriate permissions.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="accessKeyId">Access Key ID</Label>
+              <Input
+                id="accessKeyId"
+                value={awsCredentials.accessKeyId}
+                onChange={(e) => setAwsCredentials(prev => ({ ...prev, accessKeyId: e.target.value }))}
+                placeholder="e.g. AKIAIOSFODNN7EXAMPLE"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="secretAccessKey">Secret Access Key</Label>
+              <Input
+                id="secretAccessKey"
+                type="password"
+                value={awsCredentials.secretAccessKey}
+                onChange={(e) => setAwsCredentials(prev => ({ ...prev, secretAccessKey: e.target.value }))}
+                placeholder="Your secret access key"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="region">Region</Label>
+              <Input
+                id="region"
+                value={awsCredentials.region}
+                onChange={(e) => setAwsCredentials(prev => ({ ...prev, region: e.target.value }))}
+                placeholder="e.g. us-east-1"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="bucket" className="flex justify-between">
+                <span>Bucket Name</span>
+                {availableBuckets && availableBuckets.length > 0 && (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="link" className="h-6 px-0 text-xs">
+                        <Info className="w-3 h-3 mr-1" />
+                        View Available Buckets
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Available S3 Buckets</DialogTitle>
+                        <DialogDescription>
+                          Your AWS account has access to the following buckets:
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="max-h-48 overflow-y-auto">
+                        <ul className="space-y-1">
+                          {availableBuckets.map((bucket, index) => (
+                            <li 
+                              key={index} 
+                              className="p-2 hover:bg-accent rounded cursor-pointer"
+                              onClick={() => {
+                                setAwsCredentials(prev => ({ ...prev, bucket }));
+                                setShowCredentialsDialog(true);
+                              }}
+                            >
+                              {bucket}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </Label>
+              <Input
+                id="bucket"
+                value={awsCredentials.bucket}
+                onChange={(e) => setAwsCredentials(prev => ({ ...prev, bucket: e.target.value }))}
+                placeholder="Your S3 bucket name"
+              />
+            </div>
+          </div>
+          
+          <div className="flex flex-col space-y-2">
+            <div className="text-xs text-muted-foreground bg-accent/20 p-2 rounded">
+              <p className="font-medium mb-1">Required S3 bucket permissions:</p>
+              <ul className="list-disc list-inside space-y-1 pl-1">
+                <li>s3:PutObject - To upload files</li>
+                <li>s3:PutObjectAcl - To set file permissions</li>
+                <li>s3:GetObject - To retrieve files</li>
+                <li>CORS configuration must allow uploads from this domain</li>
+              </ul>
+            </div>
+          </div>
+          
+          <DialogFooter className="flex justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setShowCredentialsDialog(false)}
+            >
+              Cancel
+            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={handleTestConnection}
+                disabled={isTestingConnection}
+              >
+                Test Connection
+              </Button>
+              <Button onClick={handleUpdateAwsCredentials}>
+                Save & Connect
+              </Button>
+            </div>

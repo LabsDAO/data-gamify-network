@@ -2,7 +2,7 @@
 // AWS S3 Storage integration utility
 
 import { v4 as uuidv4 } from 'uuid';
-import { S3Client, HeadBucketCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, HeadBucketCommand, PutObjectCommand, ListBucketsCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 
 type AWSCredentials = {
@@ -101,6 +101,33 @@ export const isUsingCustomAwsCredentials = (): boolean => {
 };
 
 /**
+ * Get a list of all available buckets for the current credentials
+ * This can be used to verify bucket existence and help users select the correct bucket
+ */
+export const listAwsBuckets = async (): Promise<string[]> => {
+  const credentials = getAwsCredentials();
+  
+  try {
+    // Create S3 client
+    const s3Client = new S3Client({
+      region: credentials.region,
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey
+      }
+    });
+    
+    // List all buckets
+    const { Buckets } = await s3Client.send(new ListBucketsCommand({}));
+    
+    return (Buckets || []).map(bucket => bucket.Name || '').filter(Boolean);
+  } catch (error) {
+    console.error("Failed to list AWS S3 buckets:", error);
+    throw new Error(`Failed to list AWS S3 buckets: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
+/**
  * Test AWS S3 connectivity - returns detailed diagnostics
  */
 export const testAwsConnectivity = async (): Promise<{ 
@@ -111,6 +138,7 @@ export const testAwsConnectivity = async (): Promise<{
     bucketAccessible: boolean;
     writePermission: boolean;
     corsEnabled?: boolean;
+    availableBuckets?: string[];
   }
 }> => {
   const credentials = getAwsCredentials();
@@ -121,7 +149,8 @@ export const testAwsConnectivity = async (): Promise<{
       credentialsValid: false,
       bucketAccessible: false,
       writePermission: false,
-      corsEnabled: undefined
+      corsEnabled: undefined,
+      availableBuckets: []
     }
   };
   
@@ -144,9 +173,38 @@ export const testAwsConnectivity = async (): Promise<{
     });
     
     try {
-      // First test - check if bucket exists and is accessible
-      await s3Client.send(new HeadBucketCommand({ Bucket: credentials.bucket }));
-      results.details.bucketAccessible = true;
+      // Get list of available buckets to help user verify bucket name
+      try {
+        const { Buckets } = await s3Client.send(new ListBucketsCommand({}));
+        results.details.availableBuckets = (Buckets || []).map(bucket => bucket.Name || '').filter(Boolean);
+        
+        // Check if the specified bucket is in the list of available buckets
+        const bucketExists = results.details.availableBuckets.includes(credentials.bucket);
+        if (!bucketExists) {
+          results.message = `Bucket "${credentials.bucket}" not found. Available buckets: ${results.details.availableBuckets.join(', ')}`;
+        }
+      } catch (listError) {
+        console.error("Failed to list buckets:", listError);
+        // Not critical, continue with other tests
+      }
+      
+      try {
+        // Check if bucket exists and is accessible
+        await s3Client.send(new HeadBucketCommand({ Bucket: credentials.bucket }));
+        results.details.bucketAccessible = true;
+      } catch (headError: any) {
+        console.error("AWS S3 bucket access test failed:", headError);
+        
+        if (headError.name === 'NoSuchBucket') {
+          results.message = `Bucket "${credentials.bucket}" does not exist. Please check your bucket name.`;
+        } else if (headError.name === 'AccessDenied') {
+          results.message = `Access denied to bucket "${credentials.bucket}". Check IAM permissions.`;
+        } else {
+          results.message = `Failed to access bucket "${credentials.bucket}": ${headError.message}`;
+        }
+        
+        return results;
+      }
       
       // Second test - try to upload a tiny test file
       const testBytes = new TextEncoder().encode("AWS S3 Test");
@@ -169,15 +227,17 @@ export const testAwsConnectivity = async (): Promise<{
         
         results.success = true;
         results.message = "AWS S3 connection successful! All tests passed.";
-      } catch (putError) {
+      } catch (putError: any) {
         console.error("AWS S3 write permission test failed:", putError);
         
         if (putError.toString().includes("CORS")) {
           results.details.corsEnabled = false;
           results.message = "AWS S3 CORS configuration issue detected. You need to enable CORS on your S3 bucket.";
+        } else if (putError.name === 'AccessDenied') {
+          results.message = "AWS S3 write permission denied. Check your IAM permissions, make sure you have s3:PutObject permission.";
         } else {
           results.details.corsEnabled = undefined; // Unknown
-          results.message = "AWS S3 write permission test failed. Check your IAM permissions.";
+          results.message = `AWS S3 write permission test failed: ${putError.message}`;
         }
       }
     } catch (headError) {
@@ -190,6 +250,18 @@ export const testAwsConnectivity = async (): Promise<{
   }
   
   return results;
+};
+
+/**
+ * Generates the correct S3 bucket endpoint URL based on region
+ */
+export const getBucketEndpointUrl = (bucket: string, region: string): string => {
+  // Handle special case for us-east-1
+  if (region === 'us-east-1') {
+    return `https://${bucket}.s3.amazonaws.com`;
+  }
+  // Standard format for all other regions
+  return `https://${bucket}.s3.${region}.amazonaws.com`;
 };
 
 /**
@@ -215,6 +287,16 @@ export const uploadToAwsS3 = async (
     throw new Error('AWS credentials not configured. Please set up your AWS credentials first.');
   }
   
+  // Validate bucket name
+  if (!credentials.bucket) {
+    throw new Error('AWS S3 bucket name is not configured.');
+  }
+  
+  // Ensure region is set
+  if (!credentials.region) {
+    credentials.region = 'us-east-1'; // Default to us-east-1 if not specified
+  }
+  
   // Construct the full path including the filename with timestamp and uuid
   const timestamp = Date.now();
   const uuid = uuidv4().substring(0, 8);
@@ -225,6 +307,12 @@ export const uploadToAwsS3 = async (
     // Test connectivity before attempting upload
     const connectivityTest = await testAwsConnectivity();
     if (!connectivityTest.success) {
+      // Check if the bucket exists in available buckets
+      if (connectivityTest.details.availableBuckets && 
+          connectivityTest.details.availableBuckets.length > 0 && 
+          !connectivityTest.details.availableBuckets.includes(credentials.bucket)) {
+        throw new Error(`Bucket "${credentials.bucket}" not found. Available buckets: ${connectivityTest.details.availableBuckets.join(', ')}`);
+      }
       throw new Error(`AWS S3 connectivity issue: ${connectivityTest.message}`);
     }
     
@@ -254,7 +342,7 @@ export const uploadToAwsS3 = async (
     await upload.done();
     
     // Generate the URL for the uploaded file
-    const fileUrl = `https://${credentials.bucket}.s3.${credentials.region}.amazonaws.com/${fullPath}`;
+    const fileUrl = `${getBucketEndpointUrl(credentials.bucket, credentials.region)}/${fullPath}`;
     console.log('AWS S3 upload successful:', fileUrl);
     
     return fileUrl;

@@ -8,7 +8,8 @@ import {
   setUseRealAwsStorage,
   isUsingRealAwsStorage,
   isUsingCustomAwsCredentials,
-  testAwsConnectivity
+  testAwsConnectivity,
+  listAwsBuckets
 } from '@/utils/awsStorage';
 
 interface UseAwsStorageOptions {
@@ -25,6 +26,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
   const [error, setError] = useState<Error | null>(null);
   const [uploadUrl, setUploadUrl] = useState<string | null>(null);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [availableBuckets, setAvailableBuckets] = useState<string[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<{
     tested: boolean;
     isValid: boolean;
@@ -49,6 +51,18 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     }
   }, [options.forceReal]);
 
+  // Fetch available buckets when credentials change
+  const fetchAvailableBuckets = async () => {
+    try {
+      const buckets = await listAwsBuckets();
+      setAvailableBuckets(buckets);
+      return buckets;
+    } catch (error) {
+      console.error("Failed to fetch available buckets:", error);
+      return [];
+    }
+  };
+
   // Test AWS S3 connectivity
   const testConnection = async () => {
     setIsTestingConnection(true);
@@ -61,6 +75,14 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     
     try {
       const result = await testAwsConnectivity();
+      
+      // Update available buckets from test result
+      if (result.details.availableBuckets && result.details.availableBuckets.length > 0) {
+        setAvailableBuckets(result.details.availableBuckets);
+      } else {
+        // If not included in result, try to fetch separately
+        await fetchAvailableBuckets();
+      }
       
       setConnectionStatus({
         tested: true,
@@ -267,6 +289,57 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     });
   };
 
+  // Update credentials function
+  const updateCredentials = async (newCredentials: {
+    accessKeyId: string;
+    secretAccessKey: string;
+    region: string;
+    bucket: string;
+  }) => {
+    try {
+      // Save the new credentials
+      const updatedCreds = {
+        ...credentials,
+        ...newCredentials
+      };
+      
+      // Make sure we're using custom credentials
+      localStorage.setItem('aws_credentials', JSON.stringify(updatedCreds));
+      
+      // Test the new credentials immediately
+      setConnectionStatus({
+        tested: false,
+        isValid: false,
+        details: null,
+        message: 'Credentials updated, testing connection...'
+      });
+      
+      // Force a real storage mode
+      setUseRealAwsStorage(true);
+      
+      // Return the result of the connection test
+      return await testConnection();
+    } catch (error) {
+      console.error("Failed to update AWS credentials:", error);
+      
+      toast({
+        title: "Failed to update credentials",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+      
+      return {
+        success: false,
+        message: "Failed to update credentials",
+        details: {
+          credentialsValid: false,
+          bucketAccessible: false,
+          writePermission: false
+        }
+      };
+    }
+  };
+
   return {
     uploadFile,
     isUploading,
@@ -280,6 +353,9 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     validateFile: (file: File) => validateFile(file),
     testConnection,
     isTestingConnection,
-    connectionStatus
+    connectionStatus,
+    availableBuckets,
+    fetchAvailableBuckets,
+    updateCredentials
   };
 }
