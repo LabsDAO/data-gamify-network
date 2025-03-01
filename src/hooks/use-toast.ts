@@ -1,14 +1,24 @@
 
 // This is the actual implementation of the toast
-import { useToast as useToastUI } from "@/components/ui/use-toast";
-import type { Toast, ToastActionElement } from "@/components/ui/toast";
+import * as React from "react";
+import {
+  Toast as ToastPrimitive,
+  ToastActionElement,
+} from "@/components/ui/toast";
+import { 
+  useToast as useToastHook,
+  ToastProps as ToastHookProps 
+} from "@/components/ui/use-toast-hook";
 
-type ToastProps = Toast & {
+// Define the extended toast props with our variant option
+type ToastProps = ToastHookProps & {
   variant?: "default" | "destructive" | "success";
 };
 
-export const useToast = useToastUI;
+// Re-export the hook
+export const useToast = useToastHook;
 
+// Define and export the toast function
 type ToastFunction = (props: ToastProps) => void;
 
 export const toast: ToastFunction = (props) => {
