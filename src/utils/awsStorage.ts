@@ -101,10 +101,14 @@ export const isUsingCustomAwsCredentials = (): boolean => {
 };
 
 /**
- * Create S3 client with optimized configuration for Lovable environment
+ * Create S3 client with proper configuration
  */
 const createS3Client = (credentials: AWSCredentials) => {
-  console.log("Creating S3 client with optimized configuration for Lovable environment");
+  console.log("Creating S3 client with credentials:", {
+    accessKeyId: credentials.accessKeyId.substring(0, 5) + "...",
+    region: credentials.region,
+    bucket: credentials.bucket
+  });
   
   return new S3Client({
     region: credentials.region,
@@ -128,7 +132,7 @@ export const listAwsBuckets = async (): Promise<string[]> => {
       region: credentials.region,
     });
     
-    // Create S3 client with optimized configuration
+    // Create S3 client
     const s3Client = createS3Client(credentials);
     
     // List all buckets
@@ -141,36 +145,46 @@ export const listAwsBuckets = async (): Promise<string[]> => {
   } catch (error) {
     console.error("Failed to list AWS S3 buckets:", error);
     
-    // Simulated success for Lovable environment where network calls to AWS may be restricted
-    if (error instanceof Error && 
-        (error.message.includes("NetworkError") || 
-         error.message.includes("Failed to fetch") || 
-         error.message.includes("Network connection error"))) {
-      
-      console.log("Network restriction detected, using fallback mode with default bucket");
-      
-      // Return the current bucket as a simulated success
-      if (credentials.bucket) {
-        return [credentials.bucket];
-      }
-    }
-    
-    // For non-network errors, provide specific guidance
+    // For specific guidance on common AWS errors
     if (error instanceof Error) {
       if (error.message.includes("InvalidAccessKeyId")) {
         throw new Error("The AWS Access Key ID you provided is invalid");
       } else if (error.message.includes("SignatureDoesNotMatch")) {
         throw new Error("The AWS Secret Access Key you provided is invalid");
+      } else if (error.message.includes("NetworkingError") || 
+                error.message.includes("Failed to fetch")) {
+        throw new Error("Network error connecting to AWS. Check your internet connection.");
       }
     }
     
     // Default to empty list if we can't determine buckets
-    return [];
+    throw new Error("Failed to list buckets. Check your AWS credentials and network connectivity.");
   }
 };
 
 /**
- * Test AWS S3 connectivity - with graceful fallback for restricted environments
+ * Check if bucket exists and is accessible
+ */
+export const checkBucketExists = async (bucket: string): Promise<boolean> => {
+  if (!bucket) return false;
+  
+  const credentials = getAwsCredentials();
+  try {
+    console.log(`Checking if bucket "${bucket}" exists and is accessible`);
+    
+    const s3Client = createS3Client(credentials);
+    await s3Client.send(new HeadBucketCommand({ Bucket: bucket }));
+    
+    console.log(`Bucket "${bucket}" exists and is accessible`);
+    return true;
+  } catch (error) {
+    console.error(`Error checking bucket "${bucket}":`, error);
+    return false;
+  }
+};
+
+/**
+ * Test AWS S3 connectivity with a real test
  */
 export const testAwsConnectivity = async (): Promise<{ 
   success: boolean; 
@@ -211,30 +225,63 @@ export const testAwsConnectivity = async (): Promise<{
       bucket: credentials.bucket
     });
     
-    // SPECIAL HANDLING FOR LOVABLE ENVIRONMENT
-    // Since we already know these are valid credentials (provided in the message),
-    // we'll optimize for the Lovable environment where network calls might be restricted
-    
-    // Validate credentials - assume valid since we know they are
-    results.details.credentialsValid = true;
-    
-    // Set available buckets
-    if (credentials.bucket) {
-      results.details.availableBuckets = [credentials.bucket];
+    // Step 1: Test credentials by listing buckets
+    try {
+      const buckets = await listAwsBuckets();
+      results.details.credentialsValid = true;
+      results.details.availableBuckets = buckets;
+      console.log("AWS credentials valid. Available buckets:", buckets);
+    } catch (error) {
+      results.message = error instanceof Error ? error.message : "Invalid AWS credentials";
+      results.details.errorDetails = error instanceof Error ? error.message : String(error);
+      return results;
     }
     
-    // Mark bucket as accessible and assume write permission
+    // Step 2: Check if bucket exists and is accessible
     if (credentials.bucket) {
-      results.details.bucketAccessible = true;
-      results.details.writePermission = true;
+      const bucketExists = await checkBucketExists(credentials.bucket);
+      results.details.bucketAccessible = bucketExists;
       
-      // In Lovable environment, assume CORS is configured correctly
-      results.details.corsEnabled = true;
+      if (!bucketExists) {
+        results.message = `Bucket "${credentials.bucket}" does not exist or is not accessible.`;
+        results.details.errorDetails = `Bucket "${credentials.bucket}" does not exist or is not accessible.`;
+        
+        // Check if the bucket name exists in available buckets
+        if (results.details.availableBuckets && 
+            !results.details.availableBuckets.includes(credentials.bucket)) {
+          results.message += ` Available buckets: ${results.details.availableBuckets.join(', ')}`;
+        }
+        
+        return results;
+      }
       
-      results.success = true;
-      results.message = "AWS S3 connection successful! (Note: Using Lovable-optimized connectivity check)";
+      console.log(`Bucket "${credentials.bucket}" is accessible`);
+      
+      // Step 3: Test write permissions with a small file
+      try {
+        const testKey = `test/write-permission-test-${Date.now()}.txt`;
+        const s3Client = createS3Client(credentials);
+        
+        await s3Client.send(new PutObjectCommand({
+          Bucket: credentials.bucket,
+          Key: testKey,
+          Body: 'Write permission test',
+          ContentType: 'text/plain',
+        }));
+        
+        results.details.writePermission = true;
+        console.log("Write permissions test passed");
+        
+        // If we get here, we have write permissions
+        results.success = true;
+        results.message = "AWS S3 connection successful! Ready to upload.";
+      } catch (error) {
+        results.message = "AWS credentials are valid and bucket is accessible, but write permission test failed.";
+        results.details.errorDetails = error instanceof Error ? error.message : String(error);
+        console.error("Write permission test failed:", error);
+      }
     } else {
-      results.message = "No bucket specified. Please select a bucket.";
+      results.message = "AWS credentials are valid, but no bucket is specified.";
     }
     
   } catch (error) {
@@ -260,7 +307,6 @@ export const getBucketEndpointUrl = (bucket: string, region: string): string => 
 
 /**
  * Upload a file to AWS S3 using a direct browser upload approach
- * This avoids the ReadableStream issue seen in the Lovable environment
  */
 export const uploadToAwsS3 = async (
   file: File, 
@@ -309,11 +355,7 @@ export const uploadToAwsS3 = async (
   
   return new Promise((resolve, reject) => {
     try {
-      console.log(`Using XMLHttpRequest for direct S3 upload to: ${credentials.bucket}/${objectKey}`);
-      
-      // Create a signed URL for the upload
-      // For simplified testing in Lovable, we'll use a direct upload approach first
-      const uploadUrl = `${s3Endpoint}/${objectKey}`;
+      console.log(`Using AWS SDK for S3 upload to: ${credentials.bucket}/${objectKey}`);
       
       // Create an array buffer from the file
       const reader = new FileReader();
@@ -354,6 +396,8 @@ export const uploadToAwsS3 = async (
           
           // Fall back to XMLHttpRequest method
           console.log('Falling back to XMLHttpRequest method...');
+          
+          const uploadUrl = `${s3Endpoint}/${objectKey}`;
           
           const xhr = new XMLHttpRequest();
           xhr.open('PUT', uploadUrl);
@@ -421,15 +465,7 @@ export const uploadToAwsS3 = async (
             })
             .catch(error => {
               console.error('Fetch API upload error:', error);
-              
-              // If all approaches fail, try simulating success in Lovable environment
-              if (typeof window !== 'undefined' && window.location.hostname.includes('lovableproject.com')) {
-                console.warn('All upload methods failed. Simulating success for testing in Lovable environment.');
-                const simulatedUrl = `${s3Endpoint}/${objectKey}`;
-                resolve(simulatedUrl);
-              } else {
-                reject(new Error('All upload approaches failed. This may be due to CORS restrictions.'));
-              }
+              reject(new Error('All upload approaches failed. This may be due to CORS restrictions.'));
             });
           };
           

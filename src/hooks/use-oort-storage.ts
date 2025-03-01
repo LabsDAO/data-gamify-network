@@ -14,7 +14,7 @@ interface UseOortStorageOptions {
   onError?: (error: Error) => void;
   onProgress?: (progress: number) => void;
   path?: string;
-  forceReal?: boolean; // New option to force real storage
+  forceReal?: boolean; // Option to force real storage
 }
 
 export function useOortStorage(options: UseOortStorageOptions = {}) {

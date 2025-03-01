@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { 
@@ -9,7 +10,8 @@ import {
   isUsingCustomAwsCredentials,
   testAwsConnectivity,
   listAwsBuckets,
-  saveAwsCredentials
+  saveAwsCredentials,
+  checkBucketExists
 } from '@/utils/awsStorage';
 
 interface UseAwsStorageOptions {
@@ -45,7 +47,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       setUseRealAwsStorage(true);
       console.log("AWS S3 Storage: Forcing real storage mode");
     } else {
-      // Enable real storage by default since we have valid credentials
+      // Enable real storage by default
       setUseRealAwsStorage(true);
       console.log("AWS S3 Storage: Using real storage mode by default");
     }
@@ -56,25 +58,11 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     }
   }, [options.forceReal, options.path]);
 
-  // Fetch available buckets - with graceful fallback for Lovable environment
+  // Fetch available buckets
   const fetchAvailableBuckets = async () => {
     try {
       console.log("Fetching available S3 buckets...");
       
-      // First check if we're using the default bucket
-      const credentials = getAwsCredentials();
-      
-      // In Lovable environment, we'll optimize by returning just the configured bucket
-      // when using the default credentials
-      if (credentials.accessKeyId === "AKIAXZ5NGJRVYNNHVYFG" && 
-          credentials.bucket === "labsmarket") {
-        console.log("Using default bucket in Lovable environment");
-        const defaultBuckets = ["labsmarket"];
-        setAvailableBuckets(defaultBuckets);
-        return defaultBuckets;
-      }
-      
-      // Otherwise try to list buckets normally
       const buckets = await listAwsBuckets();
       console.log("Fetched buckets:", buckets);
       setAvailableBuckets(buckets);
@@ -82,21 +70,24 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     } catch (error) {
       console.error("Failed to fetch available buckets:", error);
       
-      // Graceful fallback - if we know the bucket, assume it exists
+      // Check if bucket exists in current credentials
       const credentials = getAwsCredentials();
       if (credentials.bucket) {
-        console.log(`Assuming bucket ${credentials.bucket} exists due to network constraints`);
-        const fallbackBuckets = [credentials.bucket];
-        setAvailableBuckets(fallbackBuckets);
-        return fallbackBuckets;
+        const bucketExists = await checkBucketExists(credentials.bucket);
+        if (bucketExists) {
+          console.log(`Current bucket ${credentials.bucket} exists`);
+          setAvailableBuckets([credentials.bucket]);
+          return [credentials.bucket];
+        }
       }
       
       // Still return an empty array so calling code can continue
+      setAvailableBuckets([]);
       return [];
     }
   };
 
-  // Test AWS S3 connectivity with improved error handling and Lovable environment optimization
+  // Test AWS S3 connectivity with real testing, not simulations
   const testConnection = async () => {
     setIsTestingConnection(true);
     setConnectionStatus({
@@ -112,53 +103,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       // Get the current credentials
       const credentials = getAwsCredentials();
       
-      // Special fast path for Lovable environment with default credentials
-      if (credentials.accessKeyId === "AKIAXZ5NGJRVYNNHVYFG" && 
-          credentials.secretAccessKey === "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" &&
-          credentials.bucket === "labsmarket") {
-        
-        console.log("Using optimized connection test for Lovable environment with default credentials");
-        
-        // Set available buckets to just the default bucket
-        setAvailableBuckets(["labsmarket"]);
-        
-        // Set connection as valid
-        setConnectionStatus({
-          tested: true,
-          isValid: true,
-          details: {
-            credentialsValid: true,
-            bucketAccessible: true,
-            writePermission: true,
-            corsEnabled: true,
-            availableBuckets: ["labsmarket"]
-          },
-          message: "AWS S3 connection successful! Ready to upload. (Optimized for Lovable environment)"
-        });
-        
-        // Provide success feedback
-        toast({
-          title: "AWS S3 Connection Successful",
-          description: "Your AWS S3 connection is ready for uploads.",
-          variant: "success",
-        });
-        
-        setIsTestingConnection(false);
-        
-        return {
-          success: true,
-          message: "AWS S3 connection successful! Ready to upload. (Optimized for Lovable environment)",
-          details: {
-            credentialsValid: true,
-            bucketAccessible: true,
-            writePermission: true,
-            corsEnabled: true,
-            availableBuckets: ["labsmarket"]
-          }
-        };
-      }
-      
-      // For custom credentials, run the actual test
+      // For any credentials, run the actual test
       const result = await testAwsConnectivity();
       console.log("AWS S3 connectivity test result:", result);
       
@@ -174,28 +119,18 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
         }
       }
       
-      // Special handling for network errors - if we have valid credentials and know the bucket exists,
-      // consider the connection partially valid even if we can't fully test connectivity
-      let isPartiallyValid = false;
-      if (!result.success && result.details.credentialsValid && 
-          result.details.availableBuckets && 
-          result.details.availableBuckets.includes(getAwsCredentials().bucket)) {
-        isPartiallyValid = true;
-        result.message += " (Note: Your credentials and bucket appear valid, but full connectivity could not be tested)";
-      }
-      
       setConnectionStatus({
         tested: true,
-        isValid: result.success || isPartiallyValid,
+        isValid: result.success,
         details: result.details,
         message: result.message
       });
       
       // Provide appropriate user feedback
       toast({
-        title: result.success || isPartiallyValid ? "AWS S3 Connection Successful" : "AWS S3 Connection Issues",
+        title: result.success ? "AWS S3 Connection Successful" : "AWS S3 Connection Issues",
         description: result.message,
-        variant: result.success || isPartiallyValid ? "success" : "destructive",
+        variant: result.success ? "success" : "destructive",
       });
       
       return result;
@@ -203,51 +138,13 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       const error = err instanceof Error ? err : new Error('Unknown error testing AWS connection');
       console.error("AWS connection test error:", error);
       
-      // Check if we're using default credentials
-      const credentials = getAwsCredentials();
-      if (credentials.accessKeyId === "AKIAXZ5NGJRVYNNHVYFG" && 
-          credentials.bucket === "labsmarket") {
-        
-        // For Lovable environment with default credentials, optimize the experience
-        console.log("Network error with default credentials - optimizing for Lovable environment");
-        
-        setConnectionStatus({
-          tested: true,
-          isValid: true,
-          details: {
-            credentialsValid: true,
-            bucketAccessible: true,
-            writePermission: true,
-            corsEnabled: true,
-            availableBuckets: ["labsmarket"]
-          },
-          message: "AWS S3 connection ready for uploads in Lovable environment."
-        });
-        
-        toast({
-          title: "AWS S3 Connection Ready",
-          description: "Using optimized connection for Lovable environment.",
-          variant: "success",
-        });
-        
-        return {
-          success: true,
-          message: "AWS S3 connection ready for uploads in Lovable environment.",
-          details: {
-            credentialsValid: true,
-            bucketAccessible: true,
-            writePermission: true,
-            corsEnabled: true,
-            availableBuckets: ["labsmarket"]
-          }
-        };
-      }
-      
-      // For other credentials, show the error
       setConnectionStatus({
         tested: true,
         isValid: false,
         details: {
+          credentialsValid: false,
+          bucketAccessible: false,
+          writePermission: false,
           errorDetails: error.message
         },
         message: error.message
@@ -274,7 +171,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     }
   };
 
-  // Upload file function with improved error handling
+  // Upload file function
   const uploadFile = async (file: File) => {
     // Validate file exists
     if (!file) {
