@@ -195,7 +195,7 @@ const TaskDetail = () => {
         const file = files[i];
         
         toast({
-          title: `Uploading file ${i + 1} of ${files.length}${storageOption === "oort" ? " to OORT labsmarket bucket" : " to AWS S3"}`,
+          title: `Uploading file ${i + 1} of ${files.length}${storageOption === "oort" ? " to OORT labsmarket bucket" : " to AWS S3 (simulated)"}`,
           description: file.name,
         });
         
@@ -230,7 +230,7 @@ const TaskDetail = () => {
         
         toast({
           title: "Upload successful!",
-          description: `You've earned ${totalPoints} points for your contribution!${storageOption === "oort" ? " Files stored in OORT labsmarket bucket." : " Files stored in AWS S3."}`,
+          description: `You've earned ${totalPoints} points for your contribution!${storageOption === "oort" ? " Files stored in OORT labsmarket bucket." : " Files stored in AWS S3 (simulated for demo)."}`,
           variant: "success"
         });
         

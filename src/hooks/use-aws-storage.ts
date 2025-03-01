@@ -141,7 +141,7 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       
       toast({
         title: "Upload successful",
-        description: `File uploaded to AWS S3: ${file.name}`,
+        description: `File uploaded to AWS S3 (simulated): ${file.name}`,
         variant: "success",
       });
       
@@ -198,10 +198,10 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     progress,
     error,
     uploadUrl,
-    hasValidCredentials: true, // Always true now with default credentials
+    hasValidCredentials, 
     isUsingCustomCredentials,
-    isUsingRealStorage: true, // Always using real storage now
-    toggleStorageMode, // Keep this for compatibility
+    isUsingRealStorage, 
+    toggleStorageMode,
     validateFile: (file: File) => validateFile(file),
   };
 }
