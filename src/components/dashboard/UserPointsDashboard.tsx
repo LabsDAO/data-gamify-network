@@ -104,47 +104,17 @@ const UserPointsDashboard: React.FC = () => {
         </CardHeader>
         
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Total Points Card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Total Points</CardTitle>
+          <div className="flex justify-center mb-6">
+            <Card className="w-full max-w-md">
+              <CardHeader className="pb-2 text-center">
+                <CardTitle className="text-xl">Total Points Earned</CardTitle>
+                <CardDescription>1 point per image upload</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-center">
                   <AnimatedNumber
                     value={user.points}
-                    className="text-4xl font-bold text-primary"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* AWS Points Card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">AWS Upload Points</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center">
-                  <AnimatedNumber
-                    value={pointsByProvider.AWS}
-                    className="text-4xl font-bold text-blue-500"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* OORT Points Card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">OORT Upload Points</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center">
-                  <AnimatedNumber
-                    value={pointsByProvider.OORT}
-                    className="text-4xl font-bold text-purple-500"
+                    className="text-6xl font-bold text-primary"
                   />
                 </div>
               </CardContent>
@@ -182,77 +152,22 @@ const UserPointsDashboard: React.FC = () => {
           {isLoading ? (
             <div className="text-center py-8">Loading your upload history...</div>
           ) : uploadHistory.length > 0 ? (
-            <Tabs defaultValue="all">
-              <TabsList className="mb-4">
-                <TabsTrigger value="all">All Uploads</TabsTrigger>
-                <TabsTrigger value="aws">AWS Uploads</TabsTrigger>
-                <TabsTrigger value="oort">OORT Uploads</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="all">
-                {Object.entries(groupedUploads).map(([date, records]) => (
-                  <div key={date} className="mb-6">
-                    <h3 className="text-sm font-medium text-muted-foreground mb-2">{date}</h3>
-                    <div className="space-y-3">
-                      {records.map((record, index) => (
-                        <UploadHistoryItem key={index} record={record} />
-                      ))}
-                    </div>
+            <div>
+              <h3 className="text-lg font-medium mb-4">Your Upload History</h3>
+              {Object.entries(groupedUploads).map(([date, records]) => (
+                <div key={date} className="mb-6">
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">{date}</h3>
+                  <div className="space-y-3">
+                    {records.map((record, index) => (
+                      <UploadHistoryItem key={index} record={record} />
+                    ))}
                   </div>
-                ))}
-              </TabsContent>
-              
-              <TabsContent value="aws">
-                {uploadHistory.filter(r => r.storage_provider === 'AWS').length > 0 ? (
-                  Object.entries(groupedUploads).map(([date, records]) => {
-                    const awsRecords = records.filter(r => r.storage_provider === 'AWS');
-                    if (awsRecords.length === 0) return null;
-                    
-                    return (
-                      <div key={date} className="mb-6">
-                        <h3 className="text-sm font-medium text-muted-foreground mb-2">{date}</h3>
-                        <div className="space-y-3">
-                          {awsRecords.map((record, index) => (
-                            <UploadHistoryItem key={index} record={record} />
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No AWS uploads found.
-                  </div>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="oort">
-                {uploadHistory.filter(r => r.storage_provider === 'OORT').length > 0 ? (
-                  Object.entries(groupedUploads).map(([date, records]) => {
-                    const oortRecords = records.filter(r => r.storage_provider === 'OORT');
-                    if (oortRecords.length === 0) return null;
-                    
-                    return (
-                      <div key={date} className="mb-6">
-                        <h3 className="text-sm font-medium text-muted-foreground mb-2">{date}</h3>
-                        <div className="space-y-3">
-                          {oortRecords.map((record, index) => (
-                            <UploadHistoryItem key={index} record={record} />
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No OORT uploads found.
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              No upload history found. Start uploading files to earn points!
+              No upload history found. Start uploading images to earn points!
             </div>
           )}
         </CardContent>
@@ -307,9 +222,7 @@ const UploadHistoryItem: React.FC<{ record: UploadRecord }> = ({ record }) => {
             {new Date(record.created_at || '').toLocaleTimeString()}
           </div>
         </div>
-        <Badge variant={record.storage_provider === 'AWS' ? 'secondary' : 'default'}>
-          {record.storage_provider}
-        </Badge>
+        {isImage && <Badge variant="default">Image</Badge>}
       </div>
       
       <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
@@ -319,15 +232,15 @@ const UploadHistoryItem: React.FC<{ record: UploadRecord }> = ({ record }) => {
       
       <div className="mt-2 flex justify-between items-center">
         <div className="font-medium text-primary">
-          +{record.points_awarded} points
+          +{record.points_awarded} point
         </div>
-        <a 
-          href={record.upload_url} 
-          target="_blank" 
+        <a
+          href={record.upload_url}
+          target="_blank"
           rel="noopener noreferrer"
           className="text-primary hover:underline text-sm"
         >
-          {isImage ? 'View Image' : 'View File'}
+          View {isImage ? 'Image' : 'File'}
         </a>
       </div>
     </div>

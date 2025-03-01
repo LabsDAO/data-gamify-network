@@ -25,10 +25,20 @@ const DesktopNavigation = ({ handleAuthAction, authenticated }: DesktopNavigatio
         Request Data
       </NavLink>
       
+      <NavLink to="/agents">
+        AI Agents
+      </NavLink>
+      
       {user && (
-        <NavLink to="/dashboard">
-          Dashboard
-        </NavLink>
+        <>
+          <NavLink to="/dashboard">
+            Dashboard
+          </NavLink>
+          
+          <NavLink to="/my-agents">
+            My Agents
+          </NavLink>
+        </>
       )}
       
       <AuthButton 

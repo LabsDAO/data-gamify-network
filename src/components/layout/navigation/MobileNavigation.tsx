@@ -49,15 +49,35 @@ const MobileNavigation = ({
           Request Data
         </NavLink>
         
+        <NavLink
+          to="/agents"
+          onClick={() => setIsMenuOpen(false)}
+          mobile
+          style={{ animationDelay: '150ms' }}
+        >
+          AI Agents
+        </NavLink>
+        
         {user && (
-          <NavLink
-            to="/dashboard"
-            onClick={() => setIsMenuOpen(false)}
-            mobile
-            style={{ animationDelay: '150ms' }}
-          >
-            Dashboard
-          </NavLink>
+          <>
+            <NavLink
+              to="/dashboard"
+              onClick={() => setIsMenuOpen(false)}
+              mobile
+              style={{ animationDelay: '200ms' }}
+            >
+              Dashboard
+            </NavLink>
+            
+            <NavLink
+              to="/my-agents"
+              onClick={() => setIsMenuOpen(false)}
+              mobile
+              style={{ animationDelay: '250ms' }}
+            >
+              My Agents
+            </NavLink>
+          </>
         )}
         
         <AuthButton 

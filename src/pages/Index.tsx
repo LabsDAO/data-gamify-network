@@ -86,7 +86,7 @@ const Index = () => {
             Where Real Effort Meets Reward
           </h1>
           <p className="text-base md:text-lg lg:text-xl text-muted-foreground max-w-3xl mb-6 md:mb-8">
-            A decentralized platform connecting trusted individuals worldwide to collect and preprocess data for AI improvement, 
+            A decentralized platform connecting trusted individuals worldwide to contribute to the Human AI economy, 
             with transparent incentives and IP monetization.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full justify-center">

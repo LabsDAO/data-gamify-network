@@ -12,6 +12,9 @@ import TaskDetail from "./pages/TaskDetail";
 import Dashboard from "./pages/Dashboard";
 import Contribute from "./pages/Contribute";
 import Request from "./pages/Request";
+import AIAgents from "./pages/AIAgents";
+import AgentDetail from "./pages/AgentDetail";
+import MyAgents from "./pages/MyAgents";
 import { PrivyProvider } from "@privy-io/react-auth";
 import Layout from "./components/layout/Layout";
 // OORT Storage is now available through our utility files
@@ -46,6 +49,9 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/contribute" element={<Contribute />} />
                 <Route path="/request" element={<Request />} />
+                <Route path="/agents" element={<AIAgents />} />
+                <Route path="/agents/:id" element={<AgentDetail />} />
+                <Route path="/my-agents" element={<MyAgents />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
