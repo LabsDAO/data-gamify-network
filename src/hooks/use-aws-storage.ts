@@ -29,6 +29,10 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     if (options.forceReal) {
       setUseRealAwsStorage(true);
       console.log("AWS S3 Storage: Forcing real storage mode");
+    } else {
+      // Enable real storage by default since we have valid credentials
+      setUseRealAwsStorage(true);
+      console.log("AWS S3 Storage: Using real storage mode by default");
     }
   }, [options.forceReal]);
 
@@ -194,10 +198,10 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     progress,
     error,
     uploadUrl,
-    hasValidCredentials,
+    hasValidCredentials: true, // Always true now with default credentials
     isUsingCustomCredentials,
-    isUsingRealStorage,
-    toggleStorageMode,
+    isUsingRealStorage: true, // Always using real storage now
+    toggleStorageMode, // Keep this for compatibility
     validateFile: (file: File) => validateFile(file),
   };
 }

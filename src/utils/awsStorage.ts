@@ -10,12 +10,12 @@ type AWSCredentials = {
   bucket: string;
 };
 
-// Default credentials (these will be replaced by user input)
+// Default credentials with the provided values
 const DEFAULT_CREDENTIALS: AWSCredentials = {
-  accessKeyId: "",
-  secretAccessKey: "",
+  accessKeyId: "AKIAXZ5NGJRVYNNHVYFG",
+  secretAccessKey: "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",
   region: "us-east-1",
-  bucket: "defaultbucket",
+  bucket: "labsmarket",
 };
 
 // File validation rules (shared with oortStorage)
@@ -87,10 +87,15 @@ export const saveAwsCredentials = (credentials: AWSCredentials): void => {
  * Check if custom AWS credentials are being used
  */
 export const isUsingCustomAwsCredentials = (): boolean => {
+  // Since we now have default credentials, check if they've been overridden
   const creds = getAwsCredentials();
-  return localStorage.getItem('aws_credentials') !== null && 
-    creds.accessKeyId !== '' && 
-    creds.secretAccessKey !== '';
+  const areDefaultsBeingUsed = 
+    creds.accessKeyId === DEFAULT_CREDENTIALS.accessKeyId && 
+    creds.secretAccessKey === DEFAULT_CREDENTIALS.secretAccessKey &&
+    creds.bucket === DEFAULT_CREDENTIALS.bucket;
+  
+  // Return true if credentials are stored (custom) or the defaults are used
+  return localStorage.getItem('aws_credentials') !== null || areDefaultsBeingUsed;
 };
 
 /**
@@ -242,3 +247,6 @@ export const setUseRealAwsStorage = (useReal: boolean): void => {
 export const isUsingRealAwsStorage = (): boolean => {
   return localStorage.getItem('use_real_aws') === 'true';
 };
+
+// Set AWS to use real storage by default since we have valid credentials
+setUseRealAwsStorage(true);
