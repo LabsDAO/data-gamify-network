@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { useOortStorage } from '@/hooks/use-oort-storage';
 
 const tasksMockData = {
   'oil-spills': {
@@ -64,8 +65,19 @@ const TaskDetail = () => {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [showAuthReminder, setShowAuthReminder] = useState(false);
   const [storageOption, setStorageOption] = useState<string>("oort");
+  const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
   
   const task = id ? tasksMockData[id as keyof typeof tasksMockData] : null;
+  
+  const { 
+    uploadFile: uploadToOort, 
+    isUploading: isOortUploading,
+    progress: oortProgress
+  } = useOortStorage({
+    onProgress: (progress) => {
+      setUploadProgress(progress);
+    }
+  });
   
   useEffect(() => {
     if (!authenticated && !user) {
@@ -141,37 +153,79 @@ const TaskDetail = () => {
     }
     
     setUploading(true);
+    setUploadProgress(0);
+    setUploadedUrls([]);
     
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 10;
-      if (progress > 100) progress = 100;
-      setUploadProgress(Math.floor(progress));
+    try {
+      const successfulUploads: string[] = [];
       
-      if (progress === 100) {
-        clearInterval(interval);
-        setTimeout(() => {
-          setUploading(false);
-          
-          const pointsEarned = task.pointsPerUpload * files.length;
-          const labelPoints = labels.trim() ? task.pointsPerLabel : 0;
-          const totalPoints = pointsEarned + labelPoints;
-          
-          addPoints(totalPoints);
-          
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        toast({
+          title: `Uploading file ${i + 1} of ${files.length}`,
+          description: file.name,
+        });
+        
+        let uploadedUrl;
+        
+        if (storageOption === "oort") {
+          uploadedUrl = await uploadToOort(file);
+        } else if (storageOption === "aws") {
           toast({
-            title: "Upload successful!",
-            description: `You've earned ${totalPoints} points for your contribution! Files stored on ${storageOption.toUpperCase()}.`,
-            variant: "success"
+            title: "AWS S3 credentials not configured",
+            description: "Using OORT Storage as fallback",
           });
-          
-          setFiles([]);
-          setLabels('');
-          setPreviewUrls([]);
-          setUploadProgress(0);
-        }, 500);
+          uploadedUrl = await uploadToOort(file);
+        } else if (storageOption === "azure") {
+          toast({
+            title: "Azure Blob Storage credentials not configured",
+            description: "Using OORT Storage as fallback",
+          });
+          uploadedUrl = await uploadToOort(file);
+        }
+        
+        if (uploadedUrl) {
+          successfulUploads.push(uploadedUrl);
+        }
       }
-    }, 300);
+      
+      setUploadedUrls(successfulUploads);
+      
+      const pointsEarned = task.pointsPerUpload * successfulUploads.length;
+      const labelPoints = labels.trim() ? task.pointsPerLabel : 0;
+      const totalPoints = pointsEarned + labelPoints;
+      
+      if (successfulUploads.length > 0) {
+        addPoints(totalPoints);
+        
+        toast({
+          title: "Upload successful!",
+          description: `You've earned ${totalPoints} points for your contribution! Files stored on ${storageOption.toUpperCase()}.`,
+          variant: "success"
+        });
+        
+        setFiles([]);
+        setLabels('');
+        setPreviewUrls([]);
+      } else {
+        toast({
+          title: "Upload failed",
+          description: "No files were successfully uploaded",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
   };
   
   const handleRemoveFile = (index: number) => {
@@ -377,6 +431,27 @@ const TaskDetail = () => {
             >
               {uploading ? 'Uploading...' : 'Upload Files'}
             </button>
+            
+            {uploadedUrls.length > 0 && (
+              <div className="mt-6">
+                <h3 className="font-semibold mb-2">Uploaded Files</h3>
+                <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-input rounded-md">
+                  {uploadedUrls.map((url, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-background/50 rounded">
+                      <a 
+                        href={url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline text-sm truncate"
+                      >
+                        {url}
+                      </a>
+                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </GlassMorphismCard>
         </div>
         
