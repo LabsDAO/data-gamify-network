@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Upload, Tag, Clock, Award, CheckCircle, XCircle, AlertCircle, Camera, Wifi, Settings, Info } from 'lucide-react';
 import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
 import { useAuth } from '@/hooks/useAuth';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { usePrivy } from '@privy-io/react-auth';
 import { Badge } from '@/components/ui/badge';
@@ -276,8 +277,8 @@ const TaskDetail = () => {
       
       setUploadedUrls(successfulUploads);
       
-      const pointsEarned = task.pointsPerUpload * successfulUploads.length;
-      const labelPoints = labels.trim() ? task.pointsPerLabel : 0;
+      const pointsEarned = task!.pointsPerUpload * successfulUploads.length;
+      const labelPoints = labels.trim() ? task!.pointsPerLabel : 0;
       const totalPoints = pointsEarned + labelPoints;
       
       if (successfulUploads.length > 0) {
@@ -883,3 +884,11 @@ const TaskDetail = () => {
                 Save & Connect
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default TaskDetail;
