@@ -139,22 +139,27 @@ const Index = () => {
         {/* CTA Section */}
         <section className="text-center px-2">
           <GlassMorphismCard 
-            className="max-w-4xl mx-auto"
+            className="max-w-4xl mx-auto py-8 md:py-10 px-6 md:px-8"
             gradient={true}
           >
-            <h2 className="text-xl md:text-2xl lg:text-3xl font-bold mb-3 md:mb-4">
-              Ready to contribute and earn rewards?
-            </h2>
-            <p className="text-muted-foreground mb-6 md:mb-8 max-w-2xl mx-auto">
-              Join our community of trusted contributors and start monetizing your data while advancing AI technology.
-            </p>
-            <button 
-              onClick={handleGetStarted}
-              className="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all mx-auto shadow-lg hover:shadow-xl hover:translate-y-[-2px]"
-            >
-              {user ? 'Go to Dashboard' : 'Join Now'}
-              <ArrowRight className="w-5 h-5" />
-            </button>
+            <div className="space-y-6 md:space-y-8">
+              <h2 className="text-xl md:text-2xl lg:text-3xl font-bold leading-tight">
+                Ready to contribute and earn rewards?
+              </h2>
+              <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+                Join our community of trusted contributors and start monetizing your data 
+                while advancing AI technology.
+              </p>
+              <div className="pt-2">
+                <button 
+                  onClick={handleGetStarted}
+                  className="w-full sm:w-auto px-6 py-4 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all mx-auto shadow-lg hover:shadow-xl hover:translate-y-[-2px]"
+                >
+                  {user ? 'Go to Dashboard' : 'Join Now'}
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
           </GlassMorphismCard>
         </section>
       </div>
