@@ -7,7 +7,8 @@ import {
   getAwsCredentials,
   setUseRealAwsStorage,
   isUsingRealAwsStorage,
-  isUsingCustomAwsCredentials
+  isUsingCustomAwsCredentials,
+  testAwsConnectivity
 } from '@/utils/awsStorage';
 
 interface UseAwsStorageOptions {
@@ -23,6 +24,18 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<Error | null>(null);
   const [uploadUrl, setUploadUrl] = useState<string | null>(null);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<{
+    tested: boolean;
+    isValid: boolean;
+    details: any;
+    message: string;
+  }>({
+    tested: false,
+    isValid: false,
+    details: null,
+    message: ''
+  });
 
   // Always enable real storage if forced, even on mount
   useEffect(() => {
@@ -35,6 +48,63 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
       console.log("AWS S3 Storage: Using real storage mode by default");
     }
   }, [options.forceReal]);
+
+  // Test AWS S3 connectivity
+  const testConnection = async () => {
+    setIsTestingConnection(true);
+    setConnectionStatus({
+      tested: false,
+      isValid: false,
+      details: null,
+      message: 'Testing AWS S3 connectivity...'
+    });
+    
+    try {
+      const result = await testAwsConnectivity();
+      
+      setConnectionStatus({
+        tested: true,
+        isValid: result.success,
+        details: result.details,
+        message: result.message
+      });
+      
+      toast({
+        title: result.success ? "AWS S3 Connection Successful" : "AWS S3 Connection Issues",
+        description: result.message,
+        variant: result.success ? "success" : "destructive",
+      });
+      
+      return result;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Unknown error testing AWS connection');
+      
+      setConnectionStatus({
+        tested: true,
+        isValid: false,
+        details: null,
+        message: error.message
+      });
+      
+      toast({
+        title: "AWS S3 Connection Test Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      
+      return {
+        success: false,
+        message: error.message,
+        details: {
+          credentialsValid: false,
+          bucketAccessible: false,
+          writePermission: false
+        }
+      };
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
 
   const uploadFile = async (file: File) => {
     if (!file) {
@@ -104,6 +174,19 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     }
     
     try {
+      // Test connection prior to uploading (but only if it hasn't been tested successfully yet)
+      if (!connectionStatus.tested || !connectionStatus.isValid) {
+        toast({
+          title: "Testing AWS S3 connection",
+          description: "Verifying AWS S3 connectivity before uploading...",
+        });
+        
+        const testResult = await testConnection();
+        if (!testResult.success) {
+          throw new Error(`AWS S3 connectivity check failed: ${testResult.message}`);
+        }
+      }
+      
       // Use a progress interval to update the UI during upload
       // Since AWS SDK v3 Upload doesn't provide progress events in browser
       const progressInterval = setInterval(() => {
@@ -195,5 +278,8 @@ export function useAwsStorage(options: UseAwsStorageOptions = {}) {
     isUsingRealStorage, 
     toggleStorageMode,
     validateFile: (file: File) => validateFile(file),
+    testConnection,
+    isTestingConnection,
+    connectionStatus
   };
 }

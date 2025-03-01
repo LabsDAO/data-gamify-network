@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Upload, Tag, Clock, Award, CheckCircle, XCircle, AlertCircle, Camera } from 'lucide-react';
+import { Upload, Tag, Clock, Award, CheckCircle, XCircle, AlertCircle, Camera, Wifi } from 'lucide-react';
 import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
@@ -67,6 +67,7 @@ const TaskDetail = () => {
   const [showAuthReminder, setShowAuthReminder] = useState(false);
   const [storageOption, setStorageOption] = useState<string>("oort");
   const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
+  const [showConnectionTest, setShowConnectionTest] = useState(false);
   
   const task = id ? tasksMockData[id as keyof typeof tasksMockData] : null;
   
@@ -92,7 +93,10 @@ const TaskDetail = () => {
     isUploading: isAwsUploading,
     progress: awsProgress,
     hasValidCredentials: hasAwsCredentials,
-    isUsingRealStorage: isUsingRealAws
+    isUsingRealStorage: isUsingRealAws,
+    testConnection,
+    isTestingConnection,
+    connectionStatus
   } = useAwsStorage({
     onProgress: (progress) => {
       if (storageOption === "aws") {
@@ -155,6 +159,13 @@ const TaskDetail = () => {
     }
   };
   
+  const handleTestConnection = async () => {
+    if (storageOption === "aws") {
+      setShowConnectionTest(true);
+      await testConnection();
+    }
+  };
+  
   const handleUpload = async () => {
     if (!authenticated && !user) {
       toast({
@@ -184,6 +195,24 @@ const TaskDetail = () => {
       return;
     }
     
+    if (storageOption === "aws" && (!connectionStatus.tested || !connectionStatus.isValid)) {
+      toast({
+        title: "Testing AWS S3 connection",
+        description: "Verifying AWS S3 connection before upload...",
+      });
+      
+      const testResult = await testConnection();
+      if (!testResult.success) {
+        toast({
+          title: "AWS S3 connection issues",
+          description: "Please fix AWS S3 connectivity issues before uploading. See details below.",
+          variant: "destructive"
+        });
+        setShowConnectionTest(true);
+        return;
+      }
+    }
+    
     setUploading(true);
     setUploadProgress(0);
     setUploadedUrls([]);
@@ -195,7 +224,7 @@ const TaskDetail = () => {
         const file = files[i];
         
         toast({
-          title: `Uploading file ${i + 1} of ${files.length}${storageOption === "oort" ? " to OORT labsmarket bucket" : " to AWS S3 (simulated)"}`,
+          title: `Uploading file ${i + 1} of ${files.length}${storageOption === "oort" ? " to OORT labsmarket bucket" : " to AWS S3"}`,
           description: file.name,
         });
         
@@ -230,7 +259,7 @@ const TaskDetail = () => {
         
         toast({
           title: "Upload successful!",
-          description: `You've earned ${totalPoints} points for your contribution!${storageOption === "oort" ? " Files stored in OORT labsmarket bucket." : " Files stored in AWS S3 (simulated for demo)."}`,
+          description: `You've earned ${totalPoints} points for your contribution!${storageOption === "oort" ? " Files stored in OORT labsmarket bucket." : " Files stored in AWS S3."}`,
           variant: "success"
         });
         
@@ -428,7 +457,10 @@ const TaskDetail = () => {
               <RadioGroup 
                 defaultValue="oort" 
                 value={storageOption} 
-                onValueChange={setStorageOption}
+                onValueChange={(val) => {
+                  setStorageOption(val);
+                  setShowConnectionTest(val === "aws");
+                }}
                 className="flex flex-col space-y-2"
               >
                 <div className="flex items-center space-x-2">
@@ -447,6 +479,103 @@ const TaskDetail = () => {
                 </div>
               </RadioGroup>
             </div>
+            
+            {showConnectionTest && storageOption === "aws" && (
+              <div className="mb-6 p-4 border border-input rounded-md bg-accent/20">
+                <h3 className="font-semibold mb-2 flex items-center gap-2">
+                  <Wifi className="w-4 h-4" />
+                  AWS S3 Connection Status
+                </h3>
+                
+                {isTestingConnection ? (
+                  <div className="space-y-2">
+                    <p className="text-sm">Testing connection to AWS S3...</p>
+                    <Progress value={50} className="h-2" />
+                  </div>
+                ) : (
+                  <>
+                    {connectionStatus.tested ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          {connectionStatus.isValid ? (
+                            <CheckCircle className="w-5 h-5 text-green-500" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-destructive" />
+                          )}
+                          <span className={connectionStatus.isValid ? "text-green-700" : "text-destructive"}>
+                            {connectionStatus.message}
+                          </span>
+                        </div>
+                        
+                        {connectionStatus.details && (
+                          <div className="text-xs space-y-1 mt-2">
+                            <div className="grid grid-cols-2 gap-1">
+                              <span>Credentials:</span>
+                              <span className={connectionStatus.details.credentialsValid ? "text-green-600" : "text-destructive"}>
+                                {connectionStatus.details.credentialsValid ? "Valid" : "Invalid"}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1">
+                              <span>Bucket Access:</span>
+                              <span className={connectionStatus.details.bucketAccessible ? "text-green-600" : "text-destructive"}>
+                                {connectionStatus.details.bucketAccessible ? "Accessible" : "Inaccessible"}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1">
+                              <span>Write Permission:</span>
+                              <span className={connectionStatus.details.writePermission ? "text-green-600" : "text-destructive"}>
+                                {connectionStatus.details.writePermission ? "Granted" : "Denied"}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1">
+                              <span>CORS Configuration:</span>
+                              <span className={
+                                connectionStatus.details.corsEnabled === undefined 
+                                  ? "text-amber-600" 
+                                  : connectionStatus.details.corsEnabled 
+                                    ? "text-green-600" 
+                                    : "text-destructive"
+                              }>
+                                {connectionStatus.details.corsEnabled === undefined 
+                                  ? "Unknown" 
+                                  : connectionStatus.details.corsEnabled 
+                                    ? "Enabled" 
+                                    : "Disabled"}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {!connectionStatus.isValid && (
+                          <div className="mt-2 text-sm text-muted-foreground">
+                            <p className="font-medium">Troubleshooting tips:</p>
+                            <ul className="list-disc list-inside text-xs mt-1 space-y-1">
+                              <li>Verify your AWS credentials are correct</li>
+                              <li>Check if your bucket exists and is accessible</li>
+                              <li>Ensure your IAM user has s3:PutObject and s3:PutObjectAcl permissions</li>
+                              <li>Add CORS configuration to your S3 bucket to allow uploads from this domain</li>
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Click "Test Connection" to verify AWS S3 connectivity before uploading.
+                      </p>
+                    )}
+                    
+                    <Button 
+                      onClick={handleTestConnection}
+                      className="mt-3 w-full"
+                      variant="outline"
+                      disabled={isTestingConnection}
+                    >
+                      Test Connection
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
             
             {uploading && (
               <div className="mb-6">

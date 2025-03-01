@@ -2,7 +2,7 @@
 // AWS S3 Storage integration utility
 
 import { v4 as uuidv4 } from 'uuid';
-import { S3Client } from '@aws-sdk/client-s3';
+import { S3Client, HeadBucketCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 
 type AWSCredentials = {
@@ -101,12 +101,107 @@ export const isUsingCustomAwsCredentials = (): boolean => {
 };
 
 /**
+ * Test AWS S3 connectivity - returns detailed diagnostics
+ */
+export const testAwsConnectivity = async (): Promise<{ 
+  success: boolean; 
+  message: string;
+  details: {
+    credentialsValid: boolean;
+    bucketAccessible: boolean;
+    writePermission: boolean;
+    corsEnabled?: boolean;
+  }
+}> => {
+  const credentials = getAwsCredentials();
+  const results = {
+    success: false,
+    message: "",
+    details: {
+      credentialsValid: false,
+      bucketAccessible: false,
+      writePermission: false,
+      corsEnabled: undefined
+    }
+  };
+  
+  try {
+    // Check if credentials are provided
+    if (!credentials.accessKeyId || !credentials.secretAccessKey) {
+      results.message = "AWS credentials are missing";
+      return results;
+    }
+    
+    results.details.credentialsValid = true;
+    
+    // Create S3 client
+    const s3Client = new S3Client({
+      region: credentials.region,
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey
+      }
+    });
+    
+    try {
+      // First test - check if bucket exists and is accessible
+      await s3Client.send(new HeadBucketCommand({ Bucket: credentials.bucket }));
+      results.details.bucketAccessible = true;
+      
+      // Second test - try to upload a tiny test file
+      const testBytes = new TextEncoder().encode("AWS S3 Test");
+      const testBlob = new Blob([testBytes], { type: 'text/plain' });
+      const testFile = new File([testBlob], "aws-connectivity-test.txt", { type: 'text/plain' });
+      
+      const testPath = `tests/aws-connectivity-test-${Date.now()}.txt`;
+      
+      try {
+        // Try direct PutObject first (simpler than multipart)
+        await s3Client.send(new PutObjectCommand({
+          Bucket: credentials.bucket,
+          Key: testPath,
+          Body: testFile,
+          ContentType: testFile.type
+        }));
+        
+        results.details.writePermission = true;
+        results.details.corsEnabled = true; // If this succeeds, CORS is likely configured properly
+        
+        results.success = true;
+        results.message = "AWS S3 connection successful! All tests passed.";
+      } catch (putError) {
+        console.error("AWS S3 write permission test failed:", putError);
+        
+        if (putError.toString().includes("CORS")) {
+          results.details.corsEnabled = false;
+          results.message = "AWS S3 CORS configuration issue detected. You need to enable CORS on your S3 bucket.";
+        } else {
+          results.details.corsEnabled = undefined; // Unknown
+          results.message = "AWS S3 write permission test failed. Check your IAM permissions.";
+        }
+      }
+    } catch (headError) {
+      console.error("AWS S3 bucket access test failed:", headError);
+      results.message = "AWS S3 bucket access failed. Check if the bucket exists and is accessible.";
+    }
+  } catch (error) {
+    console.error("AWS S3 credentials test failed:", error);
+    results.message = "AWS S3 credentials test failed: " + (error instanceof Error ? error.message : String(error));
+  }
+  
+  return results;
+};
+
+/**
  * Upload a file to AWS S3 using AWS SDK v3
  */
 export const uploadToAwsS3 = async (
   file: File, 
   path: string = 'uploads/'
 ): Promise<string> => {
+  // Log the upload attempt with details for debugging
+  console.log(`Starting AWS S3 upload: ${file.name}, Size: ${file.size} bytes, Path: ${path}`);
+  
   // Validate file first
   const validation = validateFile(file);
   if (!validation.valid) {
@@ -126,9 +221,13 @@ export const uploadToAwsS3 = async (
   const fileName = `${timestamp}-${uuid}-${file.name}`;
   const fullPath = `${path}${fileName}`.replace(/\/\//g, '/');
   
-  console.log(`Starting AWS S3 upload: ${file.name}, Size: ${file.size} bytes, Path: ${fullPath}`);
-  
   try {
+    // Test connectivity before attempting upload
+    const connectivityTest = await testAwsConnectivity();
+    if (!connectivityTest.success) {
+      throw new Error(`AWS S3 connectivity issue: ${connectivityTest.message}`);
+    }
+    
     // Create S3 client
     const s3Client = new S3Client({
       region: credentials.region,
@@ -161,9 +260,22 @@ export const uploadToAwsS3 = async (
     return fileUrl;
   } catch (error) {
     console.error('AWS S3 upload error:', error);
-    throw error instanceof Error 
-      ? error 
-      : new Error('Unknown error during AWS S3 upload');
+    
+    // Enhanced error reporting with suggested solutions
+    let errorMessage = error instanceof Error ? error.message : 'Unknown error during AWS S3 upload';
+    
+    // Add helpful suggestions based on common error patterns
+    if (errorMessage.includes('NetworkError') || errorMessage.includes('Failed to fetch')) {
+      errorMessage += ' - This could be due to network connectivity issues or CORS restrictions. Check your internet connection and S3 bucket CORS configuration.';
+    } else if (errorMessage.includes('Access Denied')) {
+      errorMessage += ' - Ensure your IAM user has sufficient permissions (s3:PutObject and s3:PutObjectAcl) for the bucket.';
+    } else if (errorMessage.includes('NoSuchBucket')) {
+      errorMessage += ' - The specified bucket does not exist. Please check your bucket name.';
+    } else if (errorMessage.includes('CORS')) {
+      errorMessage += ' - Your S3 bucket needs CORS configuration to allow uploads from this domain.';
+    }
+    
+    throw new Error(errorMessage);
   }
 };
 
