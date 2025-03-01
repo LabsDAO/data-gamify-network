@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Upload, Database, Award, Shield, BarChart3 } from 'lucide-react';
+import { ArrowRight, Upload, Database, Award, Shield, BarChart3, Bot } from 'lucide-react';
 import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,6 +50,12 @@ const Index = () => {
       description: 'Register your data as intellectual property with clear licensing terms.',
       icon: Shield,
       color: 'from-emerald-500 to-green-500'
+    },
+    {
+      title: 'AI Agents',
+      description: 'Contribute to training intelligent AI agents and help them become smarter.',
+      icon: Bot,
+      color: 'from-indigo-500 to-blue-500'
     },
     {
       title: 'Gamification',
