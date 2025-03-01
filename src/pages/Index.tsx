@@ -146,7 +146,7 @@ const Index = () => {
               <h2 className="text-xl md:text-2xl lg:text-3xl font-bold leading-tight">
                 Ready to contribute and earn rewards?
               </h2>
-              <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+              <p className="text-white text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
                 Join our community of trusted contributors and start monetizing your data 
                 while advancing AI technology.
               </p>
