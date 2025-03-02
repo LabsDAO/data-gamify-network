@@ -29,6 +29,10 @@ const DesktopNavigation = ({ handleAuthAction, authenticated }: DesktopNavigatio
         AI Agents
       </NavLink>
       
+      <NavLink to="/dataset-marketplace">
+        Datasets
+      </NavLink>
+      
       {user && (
         <>
           <NavLink to="/dashboard">
@@ -37,6 +41,10 @@ const DesktopNavigation = ({ handleAuthAction, authenticated }: DesktopNavigatio
           
           <NavLink to="/my-agents">
             My Agents
+          </NavLink>
+          
+          <NavLink to="/ip-management">
+            IP Management
           </NavLink>
         </>
       )}

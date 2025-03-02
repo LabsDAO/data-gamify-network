@@ -1,11 +1,12 @@
-
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload as UploadIcon, File, X, Check, AlertCircle, Image, Music, Video } from 'lucide-react';
+import { Upload as UploadIcon, File, X, Check, AlertCircle, Image, Music, Video, Shield } from 'lucide-react';
 import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import RegisterIPForm from '@/components/ip/RegisterIPForm';
 
 type FileType = 'image' | 'audio' | 'video' | 'unknown';
 
@@ -24,6 +25,8 @@ const Upload = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [registerIPDialogOpen, setRegisterIPDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<UploadedFile | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!user) {
@@ -168,19 +171,69 @@ const Upload = () => {
     fileInputRef.current?.click();
   };
 
+  // Handle IP registration for a file
+  const handleRegisterIP = (file: UploadedFile) => {
+    setSelectedFile(file);
+    setRegisterIPDialogOpen(true);
+  };
+
+  // Handle successful IP registration
+  const handleIPRegistrationSuccess = (ipAssetId: string) => {
+    setRegisterIPDialogOpen(false);
+    
+    toast({
+      title: "IP Registration Successful",
+      description: "Your intellectual property has been registered successfully.",
+      variant: "success"
+    });
+  };
+
   const handleContinue = () => {
     if (uploadedFiles.length > 0 && !isUploading) {
-      // In a real app, you'd probably save the file metadata to a database here
-      navigate('/preprocess');
-      toast({
-        title: "Files Ready for Preprocessing",
-        description: `${uploadedFiles.length} files have been added to your workspace.`,
-      });
+      // Show IP registration option
+      const hasImages = uploadedFiles.some(file => file.type === 'image');
+      
+      if (hasImages) {
+        toast({
+          title: "Files Uploaded Successfully",
+          description: "Would you like to register your files as intellectual property?",
+          action: (
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => {
+                  // Find the first image file
+                  const imageFile = uploadedFiles.find(file => file.type === 'image');
+                  if (imageFile) {
+                    handleRegisterIP(imageFile);
+                  }
+                }}
+                className="px-3 py-1 bg-primary text-white rounded-md text-xs"
+              >
+                Register IP
+              </button>
+              <button
+                onClick={() => navigate('/preprocess')}
+                className="px-3 py-1 bg-secondary text-foreground rounded-md text-xs"
+              >
+                Continue
+              </button>
+            </div>
+          ),
+          duration: 10000, // Show for 10 seconds
+        });
+      } else {
+        // No images, just continue
+        navigate('/preprocess');
+        toast({
+          title: "Files Ready for Preprocessing",
+          description: `${uploadedFiles.length} files have been added to your workspace.`,
+        });
+      }
     } else {
       toast({
         title: "Cannot Continue",
-        description: isUploading 
-          ? "Please wait for files to finish uploading." 
+        description: isUploading
+          ? "Please wait for files to finish uploading."
           : "Please upload at least one file before continuing.",
         variant: "destructive"
       });
@@ -325,6 +378,25 @@ const Upload = () => {
             </button>
           </div>
         </GlassMorphismCard>
+        
+        {/* IP Registration Dialog */}
+        <Dialog open={registerIPDialogOpen} onOpenChange={setRegisterIPDialogOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Register Intellectual Property</DialogTitle>
+              <DialogDescription>
+                Register your data as intellectual property on the blockchain to protect your rights and enable monetization.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedFile && (
+              <RegisterIPForm
+                onSuccess={handleIPRegistrationSuccess}
+                uploadedFileUrl={selectedFile.preview || ''}
+                uploadedFileType={selectedFile.type}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

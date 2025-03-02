@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,8 +14,13 @@ import Request from "./pages/Request";
 import AIAgents from "./pages/AIAgents";
 import AgentDetail from "./pages/AgentDetail";
 import MyAgents from "./pages/MyAgents";
+import IPManagement from "./pages/IPManagement";
+import DatasetMarketplace from "./pages/DatasetMarketplace";
+import Upload from "./pages/Upload";
+import Preprocess from "./pages/Preprocess";
 import { PrivyProvider } from "@privy-io/react-auth";
 import Layout from "./components/layout/Layout";
+// OORT Storage is now available through our utility files
 // OORT Storage is now available through our utility files
 
 const queryClient = new QueryClient();
@@ -52,6 +56,10 @@ const App = () => (
                 <Route path="/agents" element={<AIAgents />} />
                 <Route path="/agents/:id" element={<AgentDetail />} />
                 <Route path="/my-agents" element={<MyAgents />} />
+                <Route path="/ip-management" element={<IPManagement />} />
+                <Route path="/dataset-marketplace" element={<DatasetMarketplace />} />
+                <Route path="/upload" element={<Upload />} />
+                <Route path="/preprocess" element={<Preprocess />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>

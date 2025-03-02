@@ -74,7 +74,7 @@ const FALLBACK_CREDENTIALS: AWSCredentials = {
   accessKeyId: "",
   secretAccessKey: "",
   region: "us-east-1",
-  bucket: "labsmarket",
+  bucket: "", // Empty string instead of hardcoded value
 };
 
 // File validation rules (shared with oortStorage)
