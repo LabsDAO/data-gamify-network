@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Upload, Database, Award, Shield, BarChart3, Bot } from 'lucide-react';
+import { ArrowRight, Upload, Database, Award, Shield, BarChart3, Bot, Brain } from 'lucide-react';
 import GlassMorphismCard from '@/components/ui/GlassMorphismCard';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -46,16 +46,16 @@ const Index = () => {
       color: 'from-violet-500 to-purple-500'
     },
     {
+      title: 'AI Agents',
+      description: 'Browse and hire specialized AI agents for various industries and tasks.',
+      icon: Bot,
+      color: 'from-indigo-500 to-blue-500'
+    },
+    {
       title: 'IP Registration',
       description: 'Register your data as intellectual property with clear licensing terms.',
       icon: Shield,
       color: 'from-emerald-500 to-green-500'
-    },
-    {
-      title: 'AI Agents',
-      description: 'Contribute to training intelligent AI agents and help them become smarter.',
-      icon: Bot,
-      color: 'from-indigo-500 to-blue-500'
     },
     {
       title: 'Gamification',
@@ -98,10 +98,10 @@ const Index = () => {
               <ArrowRight className="w-5 h-5" />
             </button>
             <button 
-              onClick={() => navigate('/leaderboard')}
+              onClick={() => navigate('/agents')}
               className="w-full sm:w-auto px-6 py-3 bg-secondary text-foreground rounded-full font-medium flex items-center justify-center gap-2 hover:bg-secondary/80 transition-all mt-2 sm:mt-0"
             >
-              View Leaderboard
+              Explore AI Agents
             </button>
           </div>
         </section>
@@ -134,6 +134,37 @@ const Index = () => {
               </GlassMorphismCard>
             ))}
           </div>
+        </section>
+
+        {/* AI Agents Highlight Section */}
+        <section className="mb-16">
+          <GlassMorphismCard 
+            className="p-8 md:p-10"
+            gradient={false}
+          >
+            <div className="flex flex-col md:flex-row items-center gap-8">
+              <div className="md:w-1/2">
+                <div className="bg-primary/10 p-6 rounded-xl flex items-center justify-center">
+                  <Brain className="w-24 h-24 text-primary/60" />
+                </div>
+              </div>
+              <div className="md:w-1/2 text-center md:text-left">
+                <h2 className="text-2xl md:text-3xl font-bold mb-4">
+                  Discover Our AI Agent Marketplace
+                </h2>
+                <p className="text-muted-foreground mb-6">
+                  Browse our collection of specialized AI agents for various industries. From computer vision to voice assistants,
+                  find the perfect AI solution for your specific needs.
+                </p>
+                <button 
+                  onClick={() => navigate('/agents')}
+                  className="px-6 py-3 bg-primary text-white rounded-full font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-all mx-auto md:mx-0 shadow-lg"
+                >
+                  Explore AI Agents <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </GlassMorphismCard>
         </section>
 
         {/* CTA Section */}

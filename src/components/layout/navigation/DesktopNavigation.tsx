@@ -21,6 +21,10 @@ const DesktopNavigation = ({ handleAuthAction, authenticated }: DesktopNavigatio
         Contribute
       </NavLink>
       
+      <NavLink to="/agents">
+        AI Agents
+      </NavLink>
+      
       <NavLink to="/request">
         Request Data
       </NavLink>

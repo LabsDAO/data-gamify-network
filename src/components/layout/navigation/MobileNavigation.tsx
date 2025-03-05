@@ -41,10 +41,19 @@ const MobileNavigation = ({
         </NavLink>
         
         <NavLink
-          to="/request"
+          to="/agents"
           onClick={() => setIsMenuOpen(false)}
           mobile
           style={{ animationDelay: '100ms' }}
+        >
+          AI Agents
+        </NavLink>
+        
+        <NavLink
+          to="/request"
+          onClick={() => setIsMenuOpen(false)}
+          mobile
+          style={{ animationDelay: '150ms' }}
         >
           Request Data
         </NavLink>
