@@ -217,8 +217,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         newTrustLevel = 'Contributor';
       }
       
-      const updatedUser: User = { 
-        ...user, 
+      const updatedUser: User = {
+        ...user,
         points: totalPoints,
         trustLevel: newTrustLevel
       };
@@ -226,10 +226,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(updatedUser);
       localStorage.setItem('labsmarket_user', JSON.stringify(updatedUser));
       
-      toast({
-        title: "Points added!",
-        description: `You earned ${points} points!`,
-      });
+      // Toast notification is now handled in userPointsTracker.ts
+      // to avoid duplicate notifications
     }
   };
 

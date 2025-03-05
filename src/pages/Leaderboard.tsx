@@ -12,15 +12,17 @@ type LeaderboardUser = {
   trustLevel: 'Newcomer' | 'Contributor' | 'Expert';
   points: number;
   isOrganization: boolean;
+  isAIAgent?: boolean;
+  agentCategory?: string;
   rank?: number;
-  change?: 'up' | 'down' | 'same';
+  change?: 'up' | 'down' | 'same' | 'new';
 };
 
 const Leaderboard = () => {
   const { user } = useAuth();
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'individual' | 'organization'>('all');
+  const [filter, setFilter] = useState<'all' | 'individual' | 'organization' | 'ai-agent'>('all');
 
   useEffect(() => {
     const fetchLeaderboardData = async () => {
@@ -41,13 +43,24 @@ const Leaderboard = () => {
             change: 'same'
           },
           {
+            id: 'voice-real-estate',
+            username: 'PropertyVoice AI',
+            trustLevel: 'Expert',
+            points: 1150,
+            isOrganization: false,
+            isAIAgent: true,
+            agentCategory: 'Voice',
+            rank: 2,
+            change: 'up'
+          },
+          {
             id: '2',
             username: 'ai_lab_institute',
             trustLevel: 'Expert',
             points: 980,
             isOrganization: true,
-            rank: 2,
-            change: 'up'
+            rank: 3,
+            change: 'down'
           },
           {
             id: '3',
@@ -55,8 +68,19 @@ const Leaderboard = () => {
             trustLevel: 'Contributor',
             points: 875,
             isOrganization: false,
-            rank: 3,
+            rank: 4,
             change: 'down'
+          },
+          {
+            id: 'health-coach',
+            username: 'WellnessCoach AI',
+            trustLevel: 'Expert',
+            points: 820,
+            isOrganization: false,
+            isAIAgent: true,
+            agentCategory: 'Health',
+            rank: 5,
+            change: 'up'
           },
           {
             id: '4',
@@ -64,8 +88,8 @@ const Leaderboard = () => {
             trustLevel: 'Expert',
             points: 730,
             isOrganization: false,
-            rank: 4,
-            change: 'up'
+            rank: 6,
+            change: 'down'
           },
           {
             id: '5',
@@ -73,8 +97,19 @@ const Leaderboard = () => {
             trustLevel: 'Expert',
             points: 690,
             isOrganization: true,
-            rank: 5,
-            change: 'same'
+            rank: 7,
+            change: 'down'
+          },
+          {
+            id: 'multimodal-design',
+            username: 'DesignGenius AI',
+            trustLevel: 'Contributor',
+            points: 580,
+            isOrganization: false,
+            isAIAgent: true,
+            agentCategory: 'Multimodal',
+            rank: 8,
+            change: 'up'
           },
           {
             id: '6',
@@ -82,8 +117,8 @@ const Leaderboard = () => {
             trustLevel: 'Contributor',
             points: 350,
             isOrganization: false,
-            rank: 6,
-            change: 'up'
+            rank: 9,
+            change: 'down'
           },
           {
             id: '7',
@@ -91,8 +126,19 @@ const Leaderboard = () => {
             trustLevel: 'Contributor',
             points: 320,
             isOrganization: false,
-            rank: 7,
+            rank: 10,
             change: 'down'
+          },
+          {
+            id: 'vision-retail',
+            username: 'RetailVision AI',
+            trustLevel: 'Newcomer',
+            points: 280,
+            isOrganization: false,
+            isAIAgent: true,
+            agentCategory: 'Vision',
+            rank: 11,
+            change: 'new'
           },
           {
             id: '8',
@@ -100,8 +146,8 @@ const Leaderboard = () => {
             trustLevel: 'Newcomer',
             points: 180,
             isOrganization: false,
-            rank: 8,
-            change: 'up'
+            rank: 12,
+            change: 'down'
           },
           {
             id: '9',
@@ -109,8 +155,8 @@ const Leaderboard = () => {
             trustLevel: 'Newcomer',
             points: 150,
             isOrganization: false,
-            rank: 9,
-            change: 'same'
+            rank: 13,
+            change: 'down'
           },
           {
             id: '10',
@@ -118,7 +164,7 @@ const Leaderboard = () => {
             trustLevel: 'Contributor',
             points: 120,
             isOrganization: true,
-            rank: 10,
+            rank: 14,
             change: 'down'
           },
         ];
@@ -133,8 +179,9 @@ const Leaderboard = () => {
   }, []);
 
   const filteredData = leaderboardData.filter(item => {
-    if (filter === 'individual') return !item.isOrganization;
+    if (filter === 'individual') return !item.isOrganization && !item.isAIAgent;
     if (filter === 'organization') return item.isOrganization;
+    if (filter === 'ai-agent') return item.isAIAgent;
     return true;
   });
 
@@ -159,9 +206,10 @@ const Leaderboard = () => {
     );
   };
 
-  const renderChangeIndicator = (change?: 'up' | 'down' | 'same') => {
+  const renderChangeIndicator = (change?: 'up' | 'down' | 'same' | 'new') => {
     if (change === 'up') return <ArrowUp className="w-4 h-4 text-green-500" />;
     if (change === 'down') return <ArrowDown className="w-4 h-4 text-red-500" />;
+    if (change === 'new') return <Star className="w-4 h-4 text-amber-500" />;
     return null;
   };
 
@@ -210,17 +258,29 @@ const Leaderboard = () => {
               <span className="hidden md:inline">Individual</span>
               <Users className="w-4 h-4 md:hidden" />
             </button>
-            <button 
-              onClick={() => setFilter('organization')} 
+            <button
+              onClick={() => setFilter('organization')}
               className={cn(
                 "px-4 py-2 rounded-full text-sm font-medium transition-colors",
-                filter === 'organization' 
-                  ? "bg-primary text-white" 
+                filter === 'organization'
+                  ? "bg-primary text-white"
                   : "bg-secondary text-foreground hover:bg-secondary/80"
               )}
             >
               <span className="hidden md:inline">Organization</span>
               <Award className="w-4 h-4 md:hidden" />
+            </button>
+            <button
+              onClick={() => setFilter('ai-agent')}
+              className={cn(
+                "px-4 py-2 rounded-full text-sm font-medium transition-colors",
+                filter === 'ai-agent'
+                  ? "bg-primary text-white"
+                  : "bg-secondary text-foreground hover:bg-secondary/80"
+              )}
+            >
+              <span className="hidden md:inline">AI Agents</span>
+              <Star className="w-4 h-4 md:hidden" />
             </button>
           </div>
         </div>
@@ -272,7 +332,11 @@ const Leaderboard = () => {
                       </td>
                       <td className="px-6 py-4">
                         <span className="px-2 py-1 rounded-full text-xs font-medium bg-secondary text-foreground">
-                          {item.isOrganization ? 'Organization' : 'Individual'}
+                          {item.isAIAgent
+                            ? `AI Agent (${item.agentCategory})`
+                            : item.isOrganization
+                              ? 'Organization'
+                              : 'Individual'}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right font-bold">

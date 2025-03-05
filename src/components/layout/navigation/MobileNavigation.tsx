@@ -58,25 +58,63 @@ const MobileNavigation = ({
           Request Data
         </NavLink>
         
+        <NavLink
+          to="/agents"
+          onClick={() => setIsMenuOpen(false)}
+          mobile
+          style={{ animationDelay: '150ms' }}
+        >
+          AI Agents
+        </NavLink>
+        
+        <NavLink
+          to="/dataset-marketplace"
+          onClick={() => setIsMenuOpen(false)}
+          mobile
+          style={{ animationDelay: '200ms' }}
+        >
+          Datasets
+        </NavLink>
+        
         {user && (
-          <NavLink
-            to="/dashboard"
-            onClick={() => setIsMenuOpen(false)}
-            mobile
-            style={{ animationDelay: '200ms' }}
-          >
-            Dashboard
-          </NavLink>
+          <>
+            <NavLink
+              to="/dashboard"
+              onClick={() => setIsMenuOpen(false)}
+              mobile
+              style={{ animationDelay: '250ms' }}
+            >
+              Dashboard
+            </NavLink>
+            
+            <NavLink
+              to="/my-agents"
+              onClick={() => setIsMenuOpen(false)}
+              mobile
+              style={{ animationDelay: '300ms' }}
+            >
+              My Agents
+            </NavLink>
+            
+            <NavLink
+              to="/ip-management"
+              onClick={() => setIsMenuOpen(false)}
+              mobile
+              style={{ animationDelay: '350ms' }}
+            >
+              IP Management
+            </NavLink>
+          </>
         )}
         
-        <AuthButton 
+        <AuthButton
           authenticated={authenticated}
           onClick={() => {
             setIsMenuOpen(false);
             handleAuthAction();
           }}
           mobile
-          style={{ animationDelay: user ? '250ms' : '200ms' }}
+          style={{ animationDelay: user ? '400ms' : '250ms' }}
         />
       </nav>
     </div>

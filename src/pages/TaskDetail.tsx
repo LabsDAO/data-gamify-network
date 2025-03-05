@@ -23,8 +23,8 @@ const tasksMockData = {
     id: 'oil-spills',
     title: 'Oil Spill Detection Dataset',
     description: 'Collect images of oil spills in various environments to help train AI models for early detection and environmental protection.',
-    pointsPerUpload: 25,
-    pointsPerLabel: 10,
+    pointsPerUpload: 1,
+    pointsPerLabel: 1,
     deadline: '2024-05-15',
     requiredUploads: 5,
     category: 'Environmental',
@@ -40,8 +40,8 @@ const tasksMockData = {
     id: 'flat-tires',
     title: 'Flat Tire Recognition Dataset',
     description: 'Help build a dataset of flat tires in various conditions to train AI systems for roadside assistance and autonomous vehicle safety.',
-    pointsPerUpload: 20,
-    pointsPerLabel: 8,
+    pointsPerUpload: 1,
+    pointsPerLabel: 1,
     deadline: '2024-04-30',
     requiredUploads: 8,
     category: 'Automotive',
@@ -401,7 +401,7 @@ const TaskDetail = () => {
               </div>
               <div className="flex items-center gap-1">
                 <Award className="w-4 h-4 text-amber-500" />
-                <span>{task.pointsPerUpload} points per upload</span>
+                <span>1 point per image upload</span>
               </div>
               <div className="flex items-center gap-1">
                 <Tag className="w-4 h-4 text-emerald-500" />
